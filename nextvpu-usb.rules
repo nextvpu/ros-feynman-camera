@@ -1,0 +1,1 @@
+SUBSYSTEM=="usb", ATTR{idProduct}=="5055", ATTR{idVendor}=="4e56", MODE:="0666", OWNER:="root", GROUP:="video", SYMLINK+="feynman"

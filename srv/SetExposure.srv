@@ -1,0 +1,6 @@
+int32 isauto
+int32 leftexposureus
+int32 rightexposureus
+int32 leftgain
+int32 rightgain
+---

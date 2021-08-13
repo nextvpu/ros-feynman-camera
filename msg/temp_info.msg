@@ -1,0 +1,2 @@
+float32 cputemp
+float32 projectortemp
