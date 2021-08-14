@@ -129,7 +129,7 @@ The usage of other services,  is same as above examples.
 
 ## License
 
-Copyright 2019 NextVPU Ltd.
+Copyright 2019 NextVPU Co., Ltd.
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this project except in compliance with the License. You may obtain a copy of the License at
 
