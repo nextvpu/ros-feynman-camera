@@ -12,6 +12,7 @@
 #include "feynman_camera/cnn_box.h"
 #include "feynman_camera/cnn_info.h"
 #include "yuv_rgb.h"
+#include <std_msgs/String.h>
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 #include <pcl_conversions/pcl_conversions.h>
@@ -191,6 +192,7 @@ typedef struct
   ros::Publisher rectifyleftpublisher;
   ros::Publisher rectifyrightpublisher;
   ros::Publisher cnnpublisher;
+  ros::Publisher logpublisher;
 } DEVICEINFO;
 
 int hasstartpipeline = 0;
@@ -370,6 +372,16 @@ void framecallback(void *data, void *userdata)
 
       info->rectifyrightpublisher.publish(new_image);
     }
+  }
+  else if (tmppack->type == FEYNMAN_LOG_DATA && tmppack->sub_type == FEYNMAN_LOG_ALL)
+  {
+    char *tmpstr = (char *)calloc(1, tmppack->len + 1);
+    memcpy(tmpstr, tmppack->data, tmppack->len);
+    std_msgs::String logmsg;
+    logmsg.data = tmpstr;
+    free(tmpstr);
+
+    info->logpublisher.publish(logmsg);
   }
   else if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_DEPTH_IMAGE_LEFT_RAW)
   {
@@ -671,6 +683,10 @@ int main(int argc, char *argv[])
 
   sprintf(tmpparamsstr, "/feynman_camera/%d/cnn_info", device_id);
   info->cnnpublisher = node_obj.advertise<feynman_camera::cnn_info>(tmpparamsstr, 10);
+
+  sprintf(tmpparamsstr, "/feynman_camera/%d/cameralog", device_id);
+  info->logpublisher = node_obj.advertise<std_msgs::String>(tmpparamsstr, 10);
+
   feynman_init();
 
   info->device_id = device_id;
