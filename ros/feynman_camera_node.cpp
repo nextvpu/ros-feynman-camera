@@ -272,7 +272,8 @@ void framecallback(void *data, void *userdata)
       static unsigned char *rgb = NULL;
       if (NULL == rgb)
         rgb = (unsigned char *)malloc(width * height * 3);
-      yuv420_rgb24_std(width, height, tmppack->data, tmppack->data + width * height, tmppack->data + width * height + width * height / 4, width, width / 2, rgb, width * 3, YCBCR_601);
+        unsigned char* tmpimgdata=tmppack->data+sizeof(FEYNMAN_USB_IMAGE_HEADER);
+      yuv420_rgb24_std(width, height, tmpimgdata, tmpimgdata+ width * height, tmpimgdata + width * height + width * height / 4, width, width / 2, rgb, width * 3, YCBCR_601);
 
       unsigned short *in_ptr = reinterpret_cast<unsigned short *>(&new_image.data[0]);
       memcpy(in_ptr, rgb, width * height * 3);
@@ -303,7 +304,8 @@ void framecallback(void *data, void *userdata)
       static unsigned char *rgb = NULL;
       if (NULL == rgb)
         rgb = (unsigned char *)malloc(width * height * 3);
-      yuv420_rgb24_std(width, height, tmppack->data, tmppack->data + width * height, tmppack->data + width * height + width * height / 4, width, width / 2, rgb, width * 3, YCBCR_601);
+        unsigned char* tmpimgdata=tmppack->data+sizeof(FEYNMAN_USB_IMAGE_HEADER);
+      yuv420_rgb24_std(width, height, tmpimgdata, tmpimgdata + width * height, tmpimgdata + width * height + width * height / 4, width, width / 2, rgb, width * 3, YCBCR_601);
 
       unsigned short *in_ptr = reinterpret_cast<unsigned short *>(&new_image.data[0]);
       memcpy(in_ptr, rgb, width * height * 3);
@@ -334,7 +336,8 @@ void framecallback(void *data, void *userdata)
       static unsigned char *rgb = NULL;
       if (NULL == rgb)
         rgb = (unsigned char *)malloc(width * height * 3);
-      yuv420_rgb24_std(width, height, tmppack->data, tmppack->data + width * height, tmppack->data + width * height + width * height / 4, width, width / 2, rgb, width * 3, YCBCR_601);
+        unsigned char* tmpimgdata=tmppack->data+sizeof(FEYNMAN_USB_IMAGE_HEADER);
+      yuv420_rgb24_std(width, height, tmpimgdata, tmpimgdata + width * height, tmpimgdata + width * height + width * height / 4, width, width / 2, rgb, width * 3, YCBCR_601);
 
       unsigned short *in_ptr = reinterpret_cast<unsigned short *>(&new_image.data[0]);
       memcpy(in_ptr, rgb, width * height * 3);
@@ -365,7 +368,8 @@ void framecallback(void *data, void *userdata)
       static unsigned char *rgb = NULL;
       if (NULL == rgb)
         rgb = (unsigned char *)malloc(width * height * 3);
-      yuv420_rgb24_std(width, height, tmppack->data, tmppack->data + width * height, tmppack->data + width * height + width * height / 4, width, width / 2, rgb, width * 3, YCBCR_601);
+        unsigned char* tmpimgdata=tmppack->data+sizeof(FEYNMAN_USB_IMAGE_HEADER);
+      yuv420_rgb24_std(width, height,tmpimgdata, tmpimgdata + width * height, tmpimgdata + width * height + width * height / 4, width, width / 2, rgb, width * 3, YCBCR_601);
 
       unsigned short *in_ptr = reinterpret_cast<unsigned short *>(&new_image.data[0]);
       memcpy(in_ptr, rgb, width * height * 3);
@@ -406,13 +410,14 @@ void framecallback(void *data, void *userdata)
       static unsigned char *rgb = NULL;
       if (NULL == rgb)
         rgb = (unsigned char *)malloc(width * height * 3);
+        unsigned char* tmpimgdata=tmppack->data+sizeof(FEYNMAN_USB_IMAGE_HEADER);
       for (int row = 0; row < height; row++)
       {
         for (int col = 0; col < width; col++)
         {
-          *(rgb + row * width * 3 + col * 3) = *(tmppack->data + row * width + col);
-          *(rgb + row * width * 3 + col * 3 + 1) = *(tmppack->data + row * width + col);
-          *(rgb + row * width * 3 + col * 3 + 2) = *(tmppack->data + row * width + col);
+          *(rgb + row * width * 3 + col * 3) = *(tmpimgdata + row * width + col);
+          *(rgb + row * width * 3 + col * 3 + 1) = *(tmpimgdata + row * width + col);
+          *(rgb + row * width * 3 + col * 3 + 2) = *(tmpimgdata + row * width + col);
         }
       }
       unsigned short *in_ptr = reinterpret_cast<unsigned short *>(&new_image.data[0]);
@@ -444,13 +449,14 @@ void framecallback(void *data, void *userdata)
       static unsigned char *rgb = NULL;
       if (NULL == rgb)
         rgb = (unsigned char *)malloc(width * height * 3);
+        unsigned char* tmpimgdata=tmppack->data+sizeof(FEYNMAN_USB_IMAGE_HEADER);
       for (int row = 0; row < height; row++)
       {
         for (int col = 0; col < width; col++)
         {
-          *(rgb + row * width * 3 + col * 3) = *(tmppack->data + row * width + col);
-          *(rgb + row * width * 3 + col * 3 + 1) = *(tmppack->data + row * width + col);
-          *(rgb + row * width * 3 + col * 3 + 2) = *(tmppack->data + row * width + col);
+          *(rgb + row * width * 3 + col * 3) = *(tmpimgdata + row * width + col);
+          *(rgb + row * width * 3 + col * 3 + 1) = *(tmpimgdata + row * width + col);
+          *(rgb + row * width * 3 + col * 3 + 2) = *(tmpimgdata + row * width + col);
         }
       }
       unsigned short *in_ptr = reinterpret_cast<unsigned short *>(&new_image.data[0]);
@@ -479,21 +485,25 @@ void framecallback(void *data, void *userdata)
       new_image.data.resize(data_size);
 
       unsigned short *in_ptr = reinterpret_cast<unsigned short *>(&new_image.data[0]);
-      memcpy(in_ptr, tmppack->data, tmppack->len);
+      
+        unsigned char* tmpimgdata=tmppack->data+sizeof(FEYNMAN_USB_IMAGE_HEADER);
+      memcpy(in_ptr, tmpimgdata, tmppack->len);
 
       info->depthrawpublisher.publish(new_image);
       /////////////////////////will publish dot cloud
       sensor_msgs::PointCloud2 new_dotcloud;
       pcl::PointCloud<pcl::PointXYZ> cloud;
 
-      double LEFTCAMERAF = 1048.0;
+      double LEFTCAMERAFX = 1048.0;
+      double LEFTCAMERAFY = 1048.0;
       double CAMERAT = 23.590832;
       double LEFTCAMERAX = 174.361675;
       double LEFTCAMERAY = 297.007244;
 
       LEFTCAMERAX = theparam.left_sensor_photocenter[0];
       LEFTCAMERAY = theparam.left_sensor_photocenter[1];
-      LEFTCAMERAF = theparam.left_sensor_focus[0];
+      LEFTCAMERAFX = theparam.left_sensor_focus[0];
+      LEFTCAMERAFY = theparam.left_sensor_focus[1];
       if (theparam.is_new_format == 1)
       {
         CAMERAT = abs(theparam.left2right_extern_param[9]);
@@ -503,7 +513,7 @@ void framecallback(void *data, void *userdata)
         CAMERAT = abs(theparam.left2right_extern_param[3]);
       }
 
-      unsigned int *tmppic = (unsigned int *)tmppack->data;
+      unsigned int *tmppic = (unsigned int *)(tmppack->data+sizeof(FEYNMAN_USB_IMAGE_HEADER));
       // Fill in the cloud data
       cloud.width = theparam.img_width;
       cloud.height = theparam.img_height; //此处也可以为cloud.width = 4; cloud.height = 2;
@@ -519,14 +529,13 @@ void framecallback(void *data, void *userdata)
           //	DOTINFO* info = &(g_dotcloud[row*width+col]);
           uint16_t depth = *(tmppic + row * width + col);
 
-          double X = col - LEFTCAMERAX;
-          double Y = row - LEFTCAMERAY;
-          double Z = LEFTCAMERAF;
-          double W = LEFTCAMERAF * CAMERAT / (double)depth;
+         double X = ((double)col - LEFTCAMERAX)*(double)depth/ LEFTCAMERAFX;
+					double Y = ((double)row - LEFTCAMERAY)*(double)depth/ LEFTCAMERAFY;
+					double Z = (double)depth;
 
-          cloud.points[index].x = X / W;
-          cloud.points[index].y = Y / W;
-          cloud.points[index].z = Z / W;
+          cloud.points[index].x = X/1000.0;
+          cloud.points[index].y = Y/1000.0;
+          cloud.points[index].z = Z/1000.0;
         }
       }
 
@@ -587,7 +596,8 @@ void framecallback(void *data, void *userdata)
       static unsigned char *buffer = NULL;
       if (NULL == buffer)
         buffer = (unsigned char *)malloc(width * height * 3);
-      nv12_rgb24_std(width, height, tmppack->data, tmppack->data + width * height, width, width, buffer, width * 3, YCBCR_601);
+        unsigned char* tmpimgdata=tmppack->data+sizeof(FEYNMAN_USB_IMAGE_HEADER);
+      nv12_rgb24_std(width, height, tmpimgdata, tmpimgdata + width * height, width, width, buffer, width * 3, YCBCR_601);
 
       unsigned short *in_ptr = reinterpret_cast<unsigned short *>(&new_image.data[0]);
 
