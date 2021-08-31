@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8.3)
 project(feynman_camera)
 
 find_package(catkin REQUIRED camera_info_manager dynamic_reconfigure sensor_msgs roscpp message_generation)
-
+SET(CMAKE_CXX_FLAGS "-g")
 #MACHINE = $(shell uname -m)
 execute_process(COMMAND uname -m  OUTPUT_VARIABLE  MACHINES )
 execute_process(COMMAND getconf LONG_BIT  OUTPUT_VARIABLE  MACHINES_BIT )
@@ -44,6 +44,8 @@ add_message_files(FILES
   temp_info.msg
   cnn_info.msg
   cnn_box.msg
+  imu_frame.msg
+  imu_info.msg
 )
 
 generate_messages(

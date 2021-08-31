@@ -2,6 +2,7 @@
   <node name="feynmannode"
         pkg="feynman_camera"
         type="feynman_camera"
+        output="screen"
         required="true">
     <param name="device_id" value="305419896" />
   </node>

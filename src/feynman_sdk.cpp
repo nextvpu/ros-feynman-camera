@@ -2,7 +2,7 @@
 #include "feynman_sdk.h"
 #ifdef _WINDOWS
 #include <process.h>
-#pragma comment(lib, "..\\libusb\\x64\\Debug\\lib\\libusb-1.0.lib")
+#pragma comment(lib, "..\\x64\\Debug\\lib\\libusb-1.0.lib")
 #else
 #include <pthread.h>
 #include <unistd.h>
@@ -14,10 +14,10 @@
 #include <stdlib.h>
 #pragma pack(1)
 
-#define KEPLER_VID 0x4E56
-#define KEPLER_PID 0x5055
-#define KEPLER_ENDPOINT_IN (LIBUSB_ENDPOINT_IN + 1)
-#define KEPLER_ENDPOINT_OUT (LIBUSB_ENDPOINT_OUT + 1)
+#define FEYNMAN_VID 0x4E56
+#define FEYNMAN_PID 0x5055
+#define FEYNMAN_ENDPOINT_IN (LIBUSB_ENDPOINT_IN + 1)
+#define FEYNMAN_ENDPOINT_OUT (LIBUSB_ENDPOINT_OUT + 1)
 
 #define USB_START_REQUEST 0x01
 #define USB_START_RESPONSE 0x02
@@ -390,7 +390,7 @@ int usb_hal_write(uint8_t *data, int len, int *bytesTransffered, int32_t timeout
 	if (feynman_hasconnect())
 	{
 
-		int32_t ret = libusb_bulk_transfer(g_h_dev_usb, KEPLER_ENDPOINT_OUT, (unsigned char *)data, len, bytesTransffered, timeout);
+		int32_t ret = libusb_bulk_transfer(g_h_dev_usb, FEYNMAN_ENDPOINT_OUT, (unsigned char *)data, len, bytesTransffered, timeout);
 
 		return ret;
 	}
@@ -500,8 +500,10 @@ void feynman_setirmanualexposure(int leftus, int leftgain, int rightus, int righ
 	}
 }
 static s_feynman_depth_config s_depthconfig = {0, 0, 0, 0, 0};
-void feynman_setresolutionfps(FEYNMAN_SENSOR_RESOLUTION_TYPE res,unsigned int fps) {
-	if (feynman_hasconnect()) {
+void feynman_setresolutionfps(FEYNMAN_SENSOR_RESOLUTION_TYPE res, unsigned int fps)
+{
+	if (feynman_hasconnect())
+	{
 		s_feynman_sensor_resolution_fps_infor info;
 		info.resolution = res;
 		info.fps = fps;
@@ -716,7 +718,7 @@ void feynman_refresh(DEVICECALLBACK callback, void *userdata)
 		}
 		int bus = libusb_get_bus_number(dev);
 		int device = libusb_get_device_address(dev);
-		if (desc.idVendor == KEPLER_VID && desc.idProduct == KEPLER_PID)
+		if (desc.idVendor == FEYNMAN_VID && desc.idProduct == FEYNMAN_PID)
 		{
 			/*	libusb_device_handle* handler = libusb_open_device_with_vid_pid(NULL, 0x0525, 0xa4a2);
 			if (handler == NULL) {
@@ -730,7 +732,7 @@ void feynman_refresh(DEVICECALLBACK callback, void *userdata)
 			if (0 == tmpbuf)
 				tmpbuf = (unsigned char *)malloc(128);
 			struct libusb_device_descriptor des;
-			struct libusb_device_handle *dev_handle = libusb_open_device_with_vid_pid(NULL, KEPLER_VID, KEPLER_PID);
+			struct libusb_device_handle *dev_handle = libusb_open_device_with_vid_pid(NULL, FEYNMAN_VID, FEYNMAN_PID);
 
 			//	libusb_get_string_descriptor_ascii(dev_handle, desc.iProduct, tmpbuf, 128);
 			//	printf("got kepler!:%s\n", tmpbuf);
@@ -765,7 +767,7 @@ static int usb_hal_read(uint8_t *data, int len, int *bytesTransffered)
 {
 	int32_t timeout = 500;
 
-	int ret = libusb_bulk_transfer(g_h_dev_usb, KEPLER_ENDPOINT_IN, (unsigned char *)data, len, bytesTransffered, timeout);
+	int ret = libusb_bulk_transfer(g_h_dev_usb, FEYNMAN_ENDPOINT_IN, (unsigned char *)data, len, bytesTransffered, timeout);
 
 	//printf("has recv:%d bytes\n", *bytesTransffered);
 	if (*bytesTransffered > 0)
@@ -777,7 +779,8 @@ static int usb_hal_read(uint8_t *data, int len, int *bytesTransffered)
 
 void feynman_setprojector(int status)
 {
-	if (feynman_hasconnect()) {
+	if (feynman_hasconnect())
+	{
 		send_one_packet(FEYNMAN_COMMAND_DATA, FEYNMAN_COMMAND_SET_PROJECTOR_CURRENT_COMMAND, sizeof(int), (const uint8_t *)&status, 2000);
 	}
 	/*if (NULL == sendqueue)
@@ -822,8 +825,15 @@ static void on_usb_data_receive(uint8_t *data, int len, FRAMECALLBACK callback)
 		printf("len not equal:%d,%d\n", len - sizeof(FEYNMAN_USBHeaderDataPacket), tmppack->len);
 		return;
 	}
-
-	if (tmppack->type == FEYNMAN_COMMAND_DATA)
+	if (tmppack->type == FEYNMAN_IMAGE_DATA)
+	{
+		callback(tmppack, connectuserdata);
+	}
+	else if (tmppack->type == FEYNMAN_IMU_DATA)
+	{
+		callback(tmppack, connectuserdata);
+	}
+	else if (tmppack->type == FEYNMAN_COMMAND_DATA)
 	{ //&&tmppack->sub_type== FEYNMAN_COMMAND_GET_DEVICE_SN_RETURN) {
 		if (tmppack->sub_type == FEYNMAN_COMMAND_GET_DEPTH_CONFIGURATION_RETURN ||
 			tmppack->sub_type == FEYNMAN_COMMAND_SET_DEPTH_CONFIGURATION_RETURN)
@@ -896,15 +906,7 @@ static void on_usb_data_process(uint8_t *data, int len, FRAMECALLBACK callback)
 	}
 	//printf("got data len:%d\n", len - 16);
 	//	printf("type:%d,sub_type:%d\n", tmppack->type, tmppack->sub_type);
-	if (tmppack->type == FEYNMAN_IMAGE_DATA)
-	{
-		callback(tmppack, connectuserdata);
-	}
-	else if (tmppack->type == FEYNMAN_DEVICE_DATA)
-	{
-		callback(tmppack, connectuserdata);
-	}
-	else if (tmppack->type == FEYNMAN_IMU_DATA)
+	if (tmppack->type == FEYNMAN_DEVICE_DATA)
 	{
 		callback(tmppack, connectuserdata);
 	}
@@ -1195,7 +1197,7 @@ static int usb_hal_open(int bus, int device)
 		printf("usb init failed");
 		return -1;
 	}
-	g_h_dev_usb = my_open_device_with_vid_pid(NULL, KEPLER_VID, KEPLER_PID, bus, device);
+	g_h_dev_usb = my_open_device_with_vid_pid(NULL, FEYNMAN_VID, FEYNMAN_PID, bus, device);
 	if (g_h_dev_usb == NULL)
 	{
 		printf("open device failed");

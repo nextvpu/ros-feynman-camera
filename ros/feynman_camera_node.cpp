@@ -9,6 +9,8 @@
 #include "feynman_camera/SetProjector.h"
 #include "feynman_camera/GetCameraParam.h"
 #include "feynman_camera/temp_info.h"
+#include "feynman_camera/imu_frame.h"
+#include "feynman_camera/imu_info.h"
 #include "feynman_camera/cnn_box.h"
 #include "feynman_camera/cnn_info.h"
 #include "yuv_rgb.h"
@@ -193,6 +195,7 @@ typedef struct
   ros::Publisher rectifyrightpublisher;
   ros::Publisher cnnpublisher;
   ros::Publisher logpublisher;
+  ros::Publisher imupublisher;
 } DEVICEINFO;
 
 int hasstartpipeline = 0;
@@ -272,8 +275,8 @@ void framecallback(void *data, void *userdata)
       static unsigned char *rgb = NULL;
       if (NULL == rgb)
         rgb = (unsigned char *)malloc(width * height * 3);
-        unsigned char* tmpimgdata=tmppack->data+sizeof(FEYNMAN_USB_IMAGE_HEADER);
-      yuv420_rgb24_std(width, height, tmpimgdata, tmpimgdata+ width * height, tmpimgdata + width * height + width * height / 4, width, width / 2, rgb, width * 3, YCBCR_601);
+      unsigned char *tmpimgdata = tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER);
+      yuv420_rgb24_std(width, height, tmpimgdata, tmpimgdata + width * height, tmpimgdata + width * height + width * height / 4, width, width / 2, rgb, width * 3, YCBCR_601);
 
       unsigned short *in_ptr = reinterpret_cast<unsigned short *>(&new_image.data[0]);
       memcpy(in_ptr, rgb, width * height * 3);
@@ -304,7 +307,7 @@ void framecallback(void *data, void *userdata)
       static unsigned char *rgb = NULL;
       if (NULL == rgb)
         rgb = (unsigned char *)malloc(width * height * 3);
-        unsigned char* tmpimgdata=tmppack->data+sizeof(FEYNMAN_USB_IMAGE_HEADER);
+      unsigned char *tmpimgdata = tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER);
       yuv420_rgb24_std(width, height, tmpimgdata, tmpimgdata + width * height, tmpimgdata + width * height + width * height / 4, width, width / 2, rgb, width * 3, YCBCR_601);
 
       unsigned short *in_ptr = reinterpret_cast<unsigned short *>(&new_image.data[0]);
@@ -336,7 +339,7 @@ void framecallback(void *data, void *userdata)
       static unsigned char *rgb = NULL;
       if (NULL == rgb)
         rgb = (unsigned char *)malloc(width * height * 3);
-        unsigned char* tmpimgdata=tmppack->data+sizeof(FEYNMAN_USB_IMAGE_HEADER);
+      unsigned char *tmpimgdata = tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER);
       yuv420_rgb24_std(width, height, tmpimgdata, tmpimgdata + width * height, tmpimgdata + width * height + width * height / 4, width, width / 2, rgb, width * 3, YCBCR_601);
 
       unsigned short *in_ptr = reinterpret_cast<unsigned short *>(&new_image.data[0]);
@@ -344,6 +347,42 @@ void framecallback(void *data, void *userdata)
 
       info->rectifyleftpublisher.publish(new_image);
     }
+  }
+  else if (tmppack->type == FEYNMAN_IMU_DATA && tmppack->sub_type == FEYNMAN_IMU_DATA_ALL)
+  {
+    s_feynman_imu_data *tmpimudata = (s_feynman_imu_data *)tmppack->data;
+    feynman_camera::imu_info imudata;
+
+    if (sizeof(s_feynman_imu_data) == tmppack->len)
+    {
+      imudata.imu_frames.resize(tmpimudata->data_number);
+      for (int i = 0; i < tmpimudata->data_number; i++)
+      {
+        printf("====================================\n");
+        printf("acc:%d,%d��%d\n", tmpimudata->imu_data[i].stAccelRawData.s16X, tmpimudata->imu_data[i].stAccelRawData.s16Y, tmpimudata->imu_data[i].stAccelRawData.s16Z);
+        printf("gyo:%d,%d��%d\n", tmpimudata->imu_data[i].stGyroRawData.s16X, tmpimudata->imu_data[i].stGyroRawData.s16Y, tmpimudata->imu_data[i].stGyroRawData.s16Z);
+        printf("mang:%d,%d��%d\n", tmpimudata->imu_data[i].stMagnRawData.s16X, tmpimudata->imu_data[i].stMagnRawData.s16Y, tmpimudata->imu_data[i].stMagnRawData.s16Z);
+        printf("temp:%d\n", tmpimudata->imu_data[i].s16TemRawData);
+        printf("timestamp:%lu\n", tmpimudata->imu_data[i].timestamp);
+        printf("====================================\n");
+        imudata.imu_frames[i].accx = tmpimudata->imu_data[i].stAccelRawData.s16X;
+        imudata.imu_frames[i].accy = tmpimudata->imu_data[i].stAccelRawData.s16Y;
+        imudata.imu_frames[i].accz = tmpimudata->imu_data[i].stAccelRawData.s16Z;
+        imudata.imu_frames[i].gyrx = tmpimudata->imu_data[i].stGyroRawData.s16X;
+        imudata.imu_frames[i].gyry = tmpimudata->imu_data[i].stGyroRawData.s16Y;
+        imudata.imu_frames[i].gyrz = tmpimudata->imu_data[i].stGyroRawData.s16Z;
+        imudata.imu_frames[i].magx = tmpimudata->imu_data[i].stMagnRawData.s16X;
+        imudata.imu_frames[i].magy = tmpimudata->imu_data[i].stMagnRawData.s16Y;
+        imudata.imu_frames[i].magz = tmpimudata->imu_data[i].stMagnRawData.s16Z;
+        imudata.imu_frames[i].temp = tmpimudata->imu_data[i].s16TemRawData;
+        imudata.imu_frames[i].timestamp = tmpimudata->imu_data[i].timestamp;
+      }
+    }
+    else
+    {
+      printf("imudata len invalid:%d!=%d\n", tmppack->len, sizeof(s_feynman_imu_data));
+    }
+    info->imupublisher.publish(imudata);
   }
   else if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_IR_IMAGE_RIGHT_VPSS)
   {
@@ -368,8 +407,8 @@ void framecallback(void *data, void *userdata)
       static unsigned char *rgb = NULL;
       if (NULL == rgb)
         rgb = (unsigned char *)malloc(width * height * 3);
-        unsigned char* tmpimgdata=tmppack->data+sizeof(FEYNMAN_USB_IMAGE_HEADER);
-      yuv420_rgb24_std(width, height,tmpimgdata, tmpimgdata + width * height, tmpimgdata + width * height + width * height / 4, width, width / 2, rgb, width * 3, YCBCR_601);
+      unsigned char *tmpimgdata = tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER);
+      yuv420_rgb24_std(width, height, tmpimgdata, tmpimgdata + width * height, tmpimgdata + width * height + width * height / 4, width, width / 2, rgb, width * 3, YCBCR_601);
 
       unsigned short *in_ptr = reinterpret_cast<unsigned short *>(&new_image.data[0]);
       memcpy(in_ptr, rgb, width * height * 3);
@@ -408,9 +447,10 @@ void framecallback(void *data, void *userdata)
       int width = new_image.width;
       int height = new_image.height;
       static unsigned char *rgb = NULL;
+      //   printf("will malloc in depth left raw!\n");
       if (NULL == rgb)
         rgb = (unsigned char *)malloc(width * height * 3);
-        unsigned char* tmpimgdata=tmppack->data+sizeof(FEYNMAN_USB_IMAGE_HEADER);
+      unsigned char *tmpimgdata = tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER);
       for (int row = 0; row < height; row++)
       {
         for (int col = 0; col < width; col++)
@@ -447,9 +487,11 @@ void framecallback(void *data, void *userdata)
       int width = new_image.width;
       int height = new_image.height;
       static unsigned char *rgb = NULL;
+
+      //   printf("will malloc in depth right raw!\n");
       if (NULL == rgb)
         rgb = (unsigned char *)malloc(width * height * 3);
-        unsigned char* tmpimgdata=tmppack->data+sizeof(FEYNMAN_USB_IMAGE_HEADER);
+      unsigned char *tmpimgdata = tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER);
       for (int row = 0; row < height; row++)
       {
         for (int col = 0; col < width; col++)
@@ -471,28 +513,32 @@ void framecallback(void *data, void *userdata)
 
     if (g_cameraparam.size() == 1)
     {
+      //   printf("will depthraw publish!\n");
       s_feynman_cam_param theparam = g_cameraparam[0];
-      sensor_msgs::Image new_image;
+      sensor_msgs::Image *new_image = new sensor_msgs::Image;
 
-      new_image.header.frame_id = "feynman_camera/depthraw";
-      new_image.width = theparam.img_width;
-      new_image.height = theparam.img_height;
-      new_image.is_bigendian = 0;
-      new_image.encoding = sensor_msgs::image_encodings::TYPE_16UC1;
-      new_image.step = sizeof(unsigned short) * new_image.width;
+      new_image->header.frame_id = "feynman_camera/depthraw";
+      new_image->width = theparam.img_width;
+      new_image->height = theparam.img_height;
+      new_image->is_bigendian = 0;
+      new_image->encoding = sensor_msgs::image_encodings::TYPE_16UC1;
+      new_image->step = sizeof(unsigned short) * new_image->width;
 
-      std::size_t data_size = new_image.step * new_image.height;
-      new_image.data.resize(data_size);
+      std::size_t data_size = new_image->step * new_image->height;
+      new_image->data.resize(data_size);
 
-      unsigned short *in_ptr = reinterpret_cast<unsigned short *>(&new_image.data[0]);
-      
-        unsigned char* tmpimgdata=tmppack->data+sizeof(FEYNMAN_USB_IMAGE_HEADER);
-      memcpy(in_ptr, tmpimgdata, tmppack->len);
+      unsigned short *in_ptr = reinterpret_cast<unsigned short *>(&new_image->data[0]);
 
-      info->depthrawpublisher.publish(new_image);
+      unsigned char *tmpimgdata = tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER);
+      memcpy(in_ptr, tmpimgdata, data_size);
+
+      info->depthrawpublisher.publish(*new_image);
+      delete new_image;
+
+      //     printf("will dotcloud publish!\n");
       /////////////////////////will publish dot cloud
-      sensor_msgs::PointCloud2 new_dotcloud;
-      pcl::PointCloud<pcl::PointXYZ> cloud;
+      sensor_msgs::PointCloud2 *pnew_dotcloud = new sensor_msgs::PointCloud2;
+      pcl::PointCloud<pcl::PointXYZ> *pcloud = new pcl::PointCloud<pcl::PointXYZ>;
 
       double LEFTCAMERAFX = 1048.0;
       double LEFTCAMERAFY = 1048.0;
@@ -500,10 +546,13 @@ void framecallback(void *data, void *userdata)
       double LEFTCAMERAX = 174.361675;
       double LEFTCAMERAY = 297.007244;
 
+      //      printf("will get some param!\n");
       LEFTCAMERAX = theparam.left_sensor_photocenter[0];
       LEFTCAMERAY = theparam.left_sensor_photocenter[1];
       LEFTCAMERAFX = theparam.left_sensor_focus[0];
       LEFTCAMERAFY = theparam.left_sensor_focus[1];
+
+      //   printf("will get camerat!\n");
       if (theparam.is_new_format == 1)
       {
         CAMERAT = abs(theparam.left2right_extern_param[9]);
@@ -513,13 +562,17 @@ void framecallback(void *data, void *userdata)
         CAMERAT = abs(theparam.left2right_extern_param[3]);
       }
 
-      unsigned int *tmppic = (unsigned int *)(tmppack->data+sizeof(FEYNMAN_USB_IMAGE_HEADER));
+      //   printf("will set depth dotclould!%dx%d\n", theparam.img_width, theparam.img_height);
+      uint16_t *tmppic = (uint16_t *)(tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER));
       // Fill in the cloud data
-      cloud.width = theparam.img_width;
-      cloud.height = theparam.img_height; //此处也可以为cloud.width = 4; cloud.height = 2;
-      cloud.points.resize(cloud.width * cloud.height);
-      int width = cloud.width;
-      int height = cloud.height;
+      pcloud->width = theparam.img_width;
+      pcloud->height = theparam.img_height; //此处也可以为cloud.width = 4; cloud.height = 2;
+                                            //   printf("will resize points!\n");
+      pcloud->points.resize(pcloud->width * pcloud->height);
+      int width = pcloud->width;
+      int height = pcloud->height;
+
+      //printf("will convert dotclould!\n");
       for (int row = 0; row < height; row++)
       {
         for (int col = 0; col < width; col++)
@@ -529,21 +582,26 @@ void framecallback(void *data, void *userdata)
           //	DOTINFO* info = &(g_dotcloud[row*width+col]);
           uint16_t depth = *(tmppic + row * width + col);
 
-         double X = ((double)col - LEFTCAMERAX)*(double)depth/ LEFTCAMERAFX;
-					double Y = ((double)row - LEFTCAMERAY)*(double)depth/ LEFTCAMERAFY;
-					double Z = (double)depth;
+          double X = ((double)col - LEFTCAMERAX) * (double)depth / LEFTCAMERAFX;
+          double Y = ((double)row - LEFTCAMERAY) * (double)depth / LEFTCAMERAFY;
+          double Z = (double)depth;
 
-          cloud.points[index].x = X/1000.0;
-          cloud.points[index].y = Y/1000.0;
-          cloud.points[index].z = Z/1000.0;
+          pcloud->points[index].x = X / 1000.0;
+          pcloud->points[index].y = Y / 1000.0;
+          pcloud->points[index].z = Z / 1000.0;
         }
       }
 
+      //printf("after convert dotclould!\n");
       //Convert the cloud to ROS message
-      pcl::toROSMsg(cloud, new_dotcloud);
-      new_dotcloud.header.frame_id = "odom";
+      pcl::toROSMsg(*pcloud, *pnew_dotcloud);
 
-      info->dotcloudpublisher.publish(new_dotcloud);
+      //printf("after torosmsg!\n");
+      pnew_dotcloud->header.frame_id = "odom";
+
+      info->dotcloudpublisher.publish(*pnew_dotcloud);
+      delete pnew_dotcloud;
+      delete pcloud;
     }
     else if (tmppack->type == FEYNMAN_CNN_DATA && tmppack->sub_type == FEYNMAN_CNN_DATA_ALL)
     {
@@ -594,16 +652,19 @@ void framecallback(void *data, void *userdata)
       int width = new_image.width;
       int height = new_image.height;
       static unsigned char *buffer = NULL;
+      // printf("will malloc in rgb:%dx%dx3!\n", width, height);
       if (NULL == buffer)
         buffer = (unsigned char *)malloc(width * height * 3);
-        unsigned char* tmpimgdata=tmppack->data+sizeof(FEYNMAN_USB_IMAGE_HEADER);
+      unsigned char *tmpimgdata = tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER);
+      //  printf("will convert nv12 to rgb24!\n");
       nv12_rgb24_std(width, height, tmpimgdata, tmpimgdata + width * height, width, width, buffer, width * 3, YCBCR_601);
-
+      //   printf("ok convert nv12 to rgb24!\n");
       unsigned short *in_ptr = reinterpret_cast<unsigned short *>(&new_image.data[0]);
-
+      //   printf("will memcpy:%d!%d\n", data_size, width * height * 3);
       memcpy(in_ptr, buffer, data_size);
-
+      //  printf("end memcpy!\n");
       info->rgbpublisher.publish(new_image);
+      //   printf("after rgb publish!\n");
     }
   }
   else
@@ -672,6 +733,8 @@ int main(int argc, char *argv[])
   info->depthrawrightpublisher = node_obj.advertise<sensor_msgs::Image>(tmpparamsstr, 10);
   sprintf(tmpparamsstr, "/feynman_camera/%d/temperature", device_id);
   info->temperaturepublisher = node_obj.advertise<feynman_camera::temp_info>(tmpparamsstr, 10);
+  sprintf(tmpparamsstr, "/feynman_camera/%d/imu", device_id);
+  info->imupublisher = node_obj.advertise<feynman_camera::imu_info>(tmpparamsstr, 10);
 
   sprintf(tmpparamsstr, "/feynman_camera/%d/dotcloud", device_id);
   info->dotcloudpublisher = node_obj.advertise<sensor_msgs::PointCloud2>(tmpparamsstr, 10);
