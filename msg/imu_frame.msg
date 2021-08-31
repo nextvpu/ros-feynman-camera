@@ -1,0 +1,11 @@
+int16 accx
+int16 accy
+int16 accz
+int16 gyrx
+int16 gyry
+int16 gyrz
+int16 magx
+int16 magy
+int16 magz
+int16 temp
+uint64 timestamp
