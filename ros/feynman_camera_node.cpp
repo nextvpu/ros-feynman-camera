@@ -359,10 +359,10 @@ void framecallback(void *data, void *userdata)
       for (int i = 0; i < tmpimudata->data_number; i++)
       {
         printf("====================================\n");
-        printf("acc:%d,%d��%d\n", tmpimudata->imu_data[i].stAccelRawData.s16X, tmpimudata->imu_data[i].stAccelRawData.s16Y, tmpimudata->imu_data[i].stAccelRawData.s16Z);
-        printf("gyo:%d,%d��%d\n", tmpimudata->imu_data[i].stGyroRawData.s16X, tmpimudata->imu_data[i].stGyroRawData.s16Y, tmpimudata->imu_data[i].stGyroRawData.s16Z);
-        printf("mang:%d,%d��%d\n", tmpimudata->imu_data[i].stMagnRawData.s16X, tmpimudata->imu_data[i].stMagnRawData.s16Y, tmpimudata->imu_data[i].stMagnRawData.s16Z);
-        printf("temp:%d\n", tmpimudata->imu_data[i].s16TemRawData);
+        printf("acc:%f,%f,%f\n", tmpimudata->imu_data[i].stAccelRawData.s16X, tmpimudata->imu_data[i].stAccelRawData.s16Y, tmpimudata->imu_data[i].stAccelRawData.s16Z);
+        printf("gyo:%f,%f,%f\n", tmpimudata->imu_data[i].stGyroRawData.s16X, tmpimudata->imu_data[i].stGyroRawData.s16Y, tmpimudata->imu_data[i].stGyroRawData.s16Z);
+        printf("mang:%f,%f,%f\n", tmpimudata->imu_data[i].stMagnRawData.s16X, tmpimudata->imu_data[i].stMagnRawData.s16Y, tmpimudata->imu_data[i].stMagnRawData.s16Z);
+        printf("temp:%f\n", tmpimudata->imu_data[i].s16TemRawData);
         printf("timestamp:%lu\n", tmpimudata->imu_data[i].timestamp);
         printf("====================================\n");
         imudata.imu_frames[i].accx = tmpimudata->imu_data[i].stAccelRawData.s16X;

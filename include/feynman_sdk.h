@@ -18,6 +18,7 @@ extern "C"
 #endif
 	typedef signed short NVP_S16;
 	typedef unsigned long long NVP_U64;
+	typedef float NVP_FLOAT;
 
 	typedef int BOOL;
 #define FEYNMAN_ONE_PACKET_DATA_MAX_SIZE (1280 * 800 * 2 + 4)
@@ -451,16 +452,16 @@ extern "C"
 		float left2rgb_extern_param[12];   /**< left and rgb extern params */
 	} s_feynman_cam_param;
 
-	/**@struct IMU_ST_SENSOR_DATA
+	/**@struct IMU_CALIBRATION_DATA
 	* @brief feynman device imu data struct \n
 	* define feynman device imu data
 	*/
 	typedef struct
 	{
-		NVP_S16 s16X;
-		NVP_S16 s16Y;
-		NVP_S16 s16Z;
-	} IMU_ST_SENSOR_DATA; // accel gyro,mang��������
+		NVP_FLOAT s16X;
+		NVP_FLOAT s16Y;
+		NVP_FLOAT s16Z;
+	} IMU_CALIBRATION_DATA; // accel gyro,mang��������
 
 	/**@struct IC20948_RAW_DATA_STRUC
 	* @brief feynman device imu data struct \n
@@ -468,12 +469,12 @@ extern "C"
 	*/
 	typedef struct
 	{
-		IMU_ST_SENSOR_DATA stGyroRawData;
-		IMU_ST_SENSOR_DATA stAccelRawData;
-		IMU_ST_SENSOR_DATA stMagnRawData;
-		NVP_S16 s16TemRawData;
+		IMU_CALIBRATION_DATA stGyroRawData;
+		IMU_CALIBRATION_DATA stAccelRawData;
+		IMU_CALIBRATION_DATA stMagnRawData;
+		NVP_FLOAT s16TemRawData;
 		NVP_U64 timestamp;
-	} IC20948_RAW_DATA_STRUC; //һ��������IMU����
+	} IC20948_CALIBRATION_DATA_STRUC; //һ��������IMU����
 
 	/**@struct s_feynman_imu_data
 	* @brief feynman device imu data struct \n
@@ -481,9 +482,9 @@ extern "C"
 	*/
 	typedef struct
 	{
-		uint32_t data_type;					  /**<  bit0:gyro,bit1:accel,bit2:MANG ,bit3:temp.0-disable,1-enable,����typeʹ�����ɸѡ���� */
-		uint32_t data_number;				  /**< ���δ������������ */
-		IC20948_RAW_DATA_STRUC imu_data[128]; /**< ÿ�����ݰ�����gyo��xyz�������ݣ� acc��xyz�������ݣ�  mang���������ݣ� temp��һ������ (���512�����ݣ�ʵ��һ�δ���С��20��) */
+		uint32_t data_type;							  /**<  bit0:gyro,bit1:accel,bit2:MANG ,bit3:temp.0-disable,1-enable,����typeʹ�����ɸѡ���� */
+		uint32_t data_number;						  /**< ���δ������������ */
+		IC20948_CALIBRATION_DATA_STRUC imu_data[128]; /**< ÿ�����ݰ�����gyo��xyz�������ݣ� acc��xyz�������ݣ�  mang���������ݣ� temp��һ������ (���512�����ݣ�ʵ��һ�δ���С��20��) */
 	} s_feynman_imu_data;
 
 	/**@struct s_feynman_upgrade_data
