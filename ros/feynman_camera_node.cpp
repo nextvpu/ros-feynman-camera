@@ -196,6 +196,7 @@ typedef struct
   ros::Publisher cnnpublisher;
   ros::Publisher logpublisher;
   ros::Publisher imupublisher;
+  ros::Publisher depthalignrgbpublisher;
 } DEVICEINFO;
 
 int hasstartpipeline = 0;
@@ -546,11 +547,24 @@ void framecallback(void *data, void *userdata)
       double LEFTCAMERAX = 174.361675;
       double LEFTCAMERAY = 297.007244;
 
+      float DEPTHINRGBROTATE[9];
+      float DEPTHINRGBOFFSET[3];
+      float RGBFX;
+      float RGBFY;
+      float RGBX;
+      float RGBY;
       //      printf("will get some param!\n");
       LEFTCAMERAX = theparam.left_sensor_photocenter[0];
       LEFTCAMERAY = theparam.left_sensor_photocenter[1];
       LEFTCAMERAFX = theparam.left_sensor_focus[0];
       LEFTCAMERAFY = theparam.left_sensor_focus[1];
+
+      memcpy(&DEPTHINRGBROTATE[0], &theparam.left2rgb_extern_param[0], 9 * sizeof(float));
+      memcpy(&DEPTHINRGBOFFSET[0], &theparam.left2rgb_extern_param[9], 3 * sizeof(float));
+      RGBFX = theparam.rgb_sensor_focus[0];
+      RGBFY = theparam.rgb_sensor_focus[1];
+      RGBX = theparam.rgb_sensor_photocenter[0];
+      RGBY = theparam.rgb_sensor_photocenter[1];
 
       //   printf("will get camerat!\n");
       if (theparam.is_new_format == 1)
@@ -572,6 +586,8 @@ void framecallback(void *data, void *userdata)
       int width = pcloud->width;
       int height = pcloud->height;
 
+      static uint16_t *depthrgbmask = (uint16_t *)malloc(width * height * sizeof(uint16_t));
+      memset(depthrgbmask, 0, width * height * sizeof(uint16_t));
       //printf("will convert dotclould!\n");
       for (int row = 0; row < height; row++)
       {
@@ -589,6 +605,27 @@ void framecallback(void *data, void *userdata)
           pcloud->points[index].x = X / 1000.0;
           pcloud->points[index].y = Y / 1000.0;
           pcloud->points[index].z = Z / 1000.0;
+          ////////////////////////////////////////////////
+          /////////////////��ʼ��depthdotcloud->rgbdotcloud
+          if (depth > 0)
+          {
+            float rgbx = (DEPTHINRGBROTATE[0] * X + DEPTHINRGBROTATE[1] * Y + DEPTHINRGBROTATE[2] * Z + DEPTHINRGBOFFSET[0]) / 1000.0;
+            float rgby = (DEPTHINRGBROTATE[3] * X + DEPTHINRGBROTATE[4] * Y + DEPTHINRGBROTATE[5] * Z + DEPTHINRGBOFFSET[1]) / 1000.0;
+            float rgbz = (DEPTHINRGBROTATE[6] * X + DEPTHINRGBROTATE[7] * Y + DEPTHINRGBROTATE[8] * Z + DEPTHINRGBOFFSET[2]) / 1000.0;
+            /////////////////rgbdotcloud->rgb
+            if (rgbz > 0.0001)
+            {
+              float tmpx = rgbx / rgbz, tmpy = rgby / rgbz;
+
+              int resultu = (int)(tmpx * RGBFX + RGBX + 0.5);
+              int resultv = (int)(tmpy * RGBFY + RGBY + 0.5);
+              //	printf("resultuv:%d,%d\n", resultu, resultv);
+              if (resultu >= 0 && resultu < width && resultv >= 0 && resultv < height)
+              {
+                *(depthrgbmask + (resultv * width + resultu)) = depth;
+              }
+            }
+          }
         }
       }
 
@@ -602,6 +639,27 @@ void framecallback(void *data, void *userdata)
       info->dotcloudpublisher.publish(*pnew_dotcloud);
       delete pnew_dotcloud;
       delete pcloud;
+
+      /////////////////////////////////
+      sensor_msgs::Image align_image;
+
+      align_image.header.frame_id = "feynman_camera/depthalignrgb";
+      align_image.width = theparam.img_width;
+      align_image.height = theparam.img_height;
+      align_image.is_bigendian = 0;
+      align_image.encoding = sensor_msgs::image_encodings::TYPE_16UC1;
+      align_image.step = sizeof(unsigned short) * align_image.width;
+
+      data_size = align_image.step * align_image.height;
+      align_image.data.resize(data_size);
+
+      in_ptr = reinterpret_cast<unsigned short *>(&align_image.data[0]);
+
+      memcpy(in_ptr, depthrgbmask, data_size);
+
+      info->depthalignrgbpublisher.publish(align_image);
+
+      /////////////////////////////////////////////
     }
     else if (tmppack->type == FEYNMAN_CNN_DATA && tmppack->sub_type == FEYNMAN_CNN_DATA_ALL)
     {
@@ -727,6 +785,10 @@ int main(int argc, char *argv[])
 
   sprintf(tmpparamsstr, "/feynman_camera/%d/depth", device_id);
   info->depthrawpublisher = node_obj.advertise<sensor_msgs::Image>(tmpparamsstr, 10);
+
+  sprintf(tmpparamsstr, "/feynman_camera/%d/depthalignrgb", device_id);
+  info->depthalignrgbpublisher = node_obj.advertise<sensor_msgs::Image>(tmpparamsstr, 10);
+
   sprintf(tmpparamsstr, "/feynman_camera/%d/depth_raw_left", device_id);
   info->depthrawleftpublisher = node_obj.advertise<sensor_msgs::Image>(tmpparamsstr, 10);
   sprintf(tmpparamsstr, "/feynman_camera/%d/depth_raw_right", device_id);
