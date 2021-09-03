@@ -197,6 +197,7 @@ typedef struct
   ros::Publisher logpublisher;
   ros::Publisher imupublisher;
   ros::Publisher depthalignrgbpublisher;
+  ros::Publisher depthalignrgbviewpublisher;
 } DEVICEINFO;
 
 int hasstartpipeline = 0;
@@ -587,7 +588,9 @@ void framecallback(void *data, void *userdata)
       int height = pcloud->height;
 
       static uint16_t *depthrgbmask = (uint16_t *)malloc(width * height * sizeof(uint16_t));
+      static uint8_t *depthrgbmaskview = (uint8_t *)malloc(width * height * 3);
       memset(depthrgbmask, 0, width * height * sizeof(uint16_t));
+      memset(depthrgbmaskview, 0, width * height * 3);
       //printf("will convert dotclould!\n");
       for (int row = 0; row < height; row++)
       {
@@ -623,6 +626,24 @@ void framecallback(void *data, void *userdata)
               if (resultu >= 0 && resultu < width && resultv >= 0 && resultv < height)
               {
                 *(depthrgbmask + (resultv * width + resultu)) = depth;
+                int effectindex = (int)((depth - 200.0) * 255.0 / 5000.0);
+                if (effectindex > 0 && effectindex <= 255)
+                {
+                  unsigned char y, u, v;
+                  int result = feynman_getyuvfromindex(effectindex, &y, &u, &v);
+                  //y = 26; u = 170; v = 122;
+                  if (result >= 0)
+                  {
+                    uint8_t fr = (uint8_t)(y + 1.4075 * (v - 128));
+
+                    uint8_t fg = (uint8_t)(y - 0.3455 * (u - 128) - 0.7169 * (v - 128));
+
+                    uint8_t fb = (uint8_t)(y + 1.779 * (u - 128));
+                    *(depthrgbmaskview + (resultv * width + resultu) * 3) = fr;
+                    *(depthrgbmaskview + (resultv * width + resultu) * 3 + 1) = fg;
+                    *(depthrgbmaskview + (resultv * width + resultu) * 3 + 2) = fb;
+                  }
+                }
               }
             }
           }
@@ -660,6 +681,26 @@ void framecallback(void *data, void *userdata)
       info->depthalignrgbpublisher.publish(align_image);
 
       /////////////////////////////////////////////
+      sensor_msgs::Image alignimage;
+
+      alignimage.header.frame_id = "feynman_camera/depthalignrgbview";
+      alignimage.width = theparam.img_width;
+      alignimage.height = theparam.img_height;
+      alignimage.is_bigendian = 0;
+      alignimage.encoding = sensor_msgs::image_encodings::RGB8;
+      alignimage.step = 3 * alignimage.width;
+
+      data_size = alignimage.step * alignimage.height;
+      alignimage.data.resize(data_size);
+
+      width = alignimage.width;
+      height = alignimage.height;
+      //   printf("ok convert nv12 to rgb24!\n");
+      unsigned char *inalign_ptr = reinterpret_cast<unsigned char *>(&alignimage.data[0]);
+      //   printf("will memcpy:%d!%d\n", data_size, width * height * 3);
+      memcpy(inalign_ptr, depthrgbmaskview, data_size);
+      //  printf("end memcpy!\n");
+      info->depthalignrgbviewpublisher.publish(alignimage);
     }
     else if (tmppack->type == FEYNMAN_CNN_DATA && tmppack->sub_type == FEYNMAN_CNN_DATA_ALL)
     {
@@ -788,6 +829,9 @@ int main(int argc, char *argv[])
 
   sprintf(tmpparamsstr, "/feynman_camera/%d/depthalignrgb", device_id);
   info->depthalignrgbpublisher = node_obj.advertise<sensor_msgs::Image>(tmpparamsstr, 10);
+
+  sprintf(tmpparamsstr, "/feynman_camera/%d/depthalignrgbview", device_id);
+  info->depthalignrgbviewpublisher = node_obj.advertise<sensor_msgs::Image>(tmpparamsstr, 10);
 
   sprintf(tmpparamsstr, "/feynman_camera/%d/depth_raw_left", device_id);
   info->depthrawleftpublisher = node_obj.advertise<sensor_msgs::Image>(tmpparamsstr, 10);
