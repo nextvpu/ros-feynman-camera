@@ -237,7 +237,6 @@ extern "C"
 		FEYNMAN_USER_DATA_TO_BOARD		/**< user defined data from pc to camera 1  */
 	} FEYNMAN_USER_DATA_SUB_TYPE;
 
-#pragma pack(1)
 	/**@struct FEYNMAN_USBHeaderDataPacket
 	* @brief usb packet struct \n
 	* define usb communication packet struct
@@ -615,7 +614,7 @@ extern "C"
 		uint64_t timestamp;	   /**< timestamp of data */
 		uint32_t reserved[16]; /**< reserved for later data definition */
 	} FEYNMAN_USB_IMAGE_HEADER;
-#pragma pack()
+
 	typedef void (*FRAMECALLBACK)(void *data, void *userdata);
 	typedef void (*DEVICECALLBACK)(const char *devicename, void *userdata);
 

@@ -239,7 +239,7 @@ void framecallback(void *data, void *userdata)
   {
     s_feynman_cam_param *tmpinfo = (s_feynman_cam_param *)tmppack->data;
 
-    if (g_cameraparam.size() == 1)
+    if (g_cameraparam.size() == 1 && tmpinfo->img_width != 0)
     {
       s_feynman_cam_param theparam = g_cameraparam[0];
       if (0 != memcmp(&theparam, tmpinfo, sizeof(s_feynman_cam_param)))
@@ -248,7 +248,7 @@ void framecallback(void *data, void *userdata)
         g_cameraparam.push_back(*tmpinfo);
       }
     }
-    else
+    else if (g_cameraparam.size() == 0 && tmpinfo->img_width != 0)
     {
       g_cameraparam.push_back(*tmpinfo);
     }
@@ -358,15 +358,19 @@ void framecallback(void *data, void *userdata)
     if (sizeof(s_feynman_imu_data) == tmppack->len)
     {
       imudata.imu_frames.resize(tmpimudata->data_number);
+      static uint64_t lasttimestamp = 0;
+      //   printf("number:%d,imuoffset:%lu\n", tmpimudata->data_number, tmpimudata->imu_data[0].timestamp - lasttimestamp);
+      lasttimestamp = tmpimudata->imu_data[0].timestamp;
       for (int i = 0; i < tmpimudata->data_number; i++)
       {
-        printf("====================================\n");
+        /*    printf("====================================\n");
         printf("acc:%f,%f,%f\n", tmpimudata->imu_data[i].stAccelRawData.s16X, tmpimudata->imu_data[i].stAccelRawData.s16Y, tmpimudata->imu_data[i].stAccelRawData.s16Z);
         printf("gyo:%f,%f,%f\n", tmpimudata->imu_data[i].stGyroRawData.s16X, tmpimudata->imu_data[i].stGyroRawData.s16Y, tmpimudata->imu_data[i].stGyroRawData.s16Z);
         printf("mang:%f,%f,%f\n", tmpimudata->imu_data[i].stMagnRawData.s16X, tmpimudata->imu_data[i].stMagnRawData.s16Y, tmpimudata->imu_data[i].stMagnRawData.s16Z);
         printf("temp:%f\n", tmpimudata->imu_data[i].s16TemRawData);
         printf("timestamp:%lu\n", tmpimudata->imu_data[i].timestamp);
         printf("====================================\n");
+        */
         imudata.imu_frames[i].accx = tmpimudata->imu_data[i].stAccelRawData.s16X;
         imudata.imu_frames[i].accy = tmpimudata->imu_data[i].stAccelRawData.s16Y;
         imudata.imu_frames[i].accz = tmpimudata->imu_data[i].stAccelRawData.s16Z;
@@ -384,7 +388,9 @@ void framecallback(void *data, void *userdata)
     {
       printf("imudata len invalid:%d!=%d\n", tmppack->len, sizeof(s_feynman_imu_data));
     }
+    //   printf("will publish imu!!!\n");
     info->imupublisher.publish(imudata);
+    //   printf("has publish imu!\n");
   }
   else if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_IR_IMAGE_RIGHT_VPSS)
   {
