@@ -233,7 +233,7 @@ void framecallback(void *data, void *userdata)
     tempinfo.projectortemp = tmpinfo->projector_temperaure[0];
 
     info->temperaturepublisher.publish(tempinfo);
-    ROS_INFO("recv deviceid:0x%X\n", tmpinfo->device_id);
+    // ROS_INFO("recv deviceid:0x%X\n", tmpinfo->device_id);
   }
   else if (tmppack->type == FEYNMAN_COMMAND_DATA && tmppack->sub_type == FEYNMAN_COMMAND_GET_CAM_PARAM_RETURN)
   {
@@ -252,7 +252,7 @@ void framecallback(void *data, void *userdata)
     {
       g_cameraparam.push_back(*tmpinfo);
     }
-    ROS_INFO("recv camera param:%dx%d\n", tmpinfo->img_width, tmpinfo->img_height);
+    // ROS_INFO("recv camera param:%dx%d\n", tmpinfo->img_width, tmpinfo->img_height);
   }
   else if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_IR_IMAGE_LEFT_VI)
   {
@@ -358,9 +358,15 @@ void framecallback(void *data, void *userdata)
     if (sizeof(s_feynman_imu_data) == tmppack->len)
     {
       imudata.imu_frames.resize(tmpimudata->data_number);
-      static uint64_t lasttimestamp = 0;
-      //   printf("number:%d,imuoffset:%lu\n", tmpimudata->data_number, tmpimudata->imu_data[0].timestamp - lasttimestamp);
-      lasttimestamp = tmpimudata->imu_data[0].timestamp;
+      static uint64_t lastbegintimestamp = 0, lastendtimestamp = 0;
+      int offset = tmpimudata->imu_data[0].timestamp - lastendtimestamp;
+      printf("big packet offset:%d\n", offset);
+      if ((offset > 5000 || offset < 4000) && lastbegintimestamp != 0)
+      {
+        printf("warning,imu packet abnormal offset!!!:%d\n", offset);
+      }
+      lastbegintimestamp = tmpimudata->imu_data[0].timestamp;
+      lastendtimestamp = tmpimudata->imu_data[tmpimudata->data_number - 1].timestamp;
       for (int i = 0; i < tmpimudata->data_number; i++)
       {
         /*    printf("====================================\n");
@@ -774,7 +780,7 @@ void framecallback(void *data, void *userdata)
   }
   else
   {
-    ROS_INFO("other data!type:%d,subtype:%d\n", tmppack->type, tmppack->sub_type);
+    // ROS_INFO("other data!type:%d,subtype:%d\n", tmppack->type, tmppack->sub_type);
   }
 }
 void callback(const char *devicename, void *userdata)
