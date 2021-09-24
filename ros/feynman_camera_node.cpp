@@ -2,6 +2,7 @@
 
 #include <string>
 #include <ros/ros.h>
+#include "feynman_camera/SaveDepth.h"
 #include "feynman_camera/SetStreamMode.h"
 #include "feynman_camera/SwitchRectify.h"
 #include "feynman_camera/SetExposure.h"
@@ -19,7 +20,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <sensor_msgs/PointCloud2.h>
-
+#include "ring_queue.h"
 //#include <pcl/ros/conversions.h>
 
 #include <sensor_msgs/Image.h>
@@ -49,6 +50,44 @@ bool handle_device_switchrectify_request(feynman_camera::SwitchRectifyRequest &r
   return true;
 }
 
+typedef struct
+{
+  int filenums;
+  char filepath[256];
+} SAVEDEPTHTASK;
+
+typedef struct
+{
+  int len;
+  char filename[256];
+  char data[1280 * 800 * 2];
+} DEPTHDATAINFO;
+
+Ring_Queue *taskqueue = NULL;
+
+bool handle_savedepth_request(feynman_camera::SaveDepthRequest &req,
+                              feynman_camera::SaveDepthResponse &res)
+{
+  //create task node and insert to queue of save depth task
+  if (NULL == taskqueue)
+  {
+    taskqueue = new Ring_Queue(9, sizeof(SAVEDEPTHTASK));
+  }
+  SAVEDEPTHTASK *tmptask = NULL;
+  while (tmptask == NULL)
+  {
+    tmptask = (SAVEDEPTHTASK *)taskqueue->SOLO_Write();
+    if (tmptask)
+    {
+      strcpy(tmptask->filepath, req.filepath.c_str());
+      tmptask->filenums = req.filenums;
+      taskqueue->SOLO_Write_Over();
+      break;
+    }
+  }
+  printf("ok to add savedepth task!\n");
+  //create tmp thread to save files
+}
 bool handle_device_streammode_request(feynman_camera::SetStreamModeRequest &req,
                                       feynman_camera::SetStreamModeResponse &res)
 {
@@ -205,6 +244,44 @@ int hasstartpipeline = 0;
 int g_hasgotparam = 0;
 void framecallback(void *data, void *userdata)
 {
+  if (NULL == taskqueue)
+  {
+    taskqueue = new Ring_Queue(9, sizeof(SAVEDEPTHTASK));
+  }
+  static SAVEDEPTHTASK *tmptask = NULL;
+  if (tmptask == NULL)
+  {
+    SAVEDEPTHTASK *task = (SAVEDEPTHTASK *)taskqueue->SOLO_Read();
+    if (task)
+    {
+      tmptask = (SAVEDEPTHTASK *)malloc(sizeof(SAVEDEPTHTASK));
+      memcpy(tmptask, task, sizeof(SAVEDEPTHTASK));
+      taskqueue->SOLO_Read_Over();
+    }
+  }
+
+  if (tmptask != NULL)
+  {
+    FEYNMAN_USBHeaderDataPacket *tmppack = (FEYNMAN_USBHeaderDataPacket *)data;
+    if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_DEPTH_IMAGE)
+    {
+      char filename[256];
+      FEYNMAN_USB_IMAGE_HEADER *tmpheader = (FEYNMAN_USB_IMAGE_HEADER *)tmppack->data;
+      sprintf(filename, "%s/depth-%u-%llu.raw", tmptask->filepath, tmpheader->group_id, tmpheader->timestamp);
+      printf("filenums:%d,will write file:%s\n", tmptask->filenums, filename);
+      FILE *fp = fopen(filename, "wb");
+      fwrite(tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER), 1, tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER), fp);
+      fclose(fp);
+      tmptask->filenums--;
+      if (tmptask->filenums == 0)
+      {
+        free(tmptask);
+        tmptask = NULL;
+      }
+    }
+    return;
+  }
+
   if (hasstartpipeline == 0)
   {
     hasstartpipeline = 1;
@@ -861,6 +938,10 @@ int main(int argc, char *argv[])
   sprintf(tmpparamsstr, "feynman_camera/%d/streammode", device_id);
 
   ros::ServiceServer devicesetsteammodeservice = node_obj.advertiseService(tmpparamsstr, handle_device_streammode_request);
+
+  sprintf(tmpparamsstr, "feynman_camera/%d/savedepth", device_id);
+
+  ros::ServiceServer savedepthservice = node_obj.advertiseService(tmpparamsstr, handle_savedepth_request);
 
   sprintf(tmpparamsstr, "feynman_camera/%d/switchrectify", device_id);
 

@@ -38,6 +38,7 @@ add_service_files(
   SetProjector.srv
   GetCameraParam.srv
   SwitchRectify.srv
+  SaveDepth.srv
 )
 
 add_message_files(FILES
