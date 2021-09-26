@@ -39,6 +39,7 @@ add_service_files(
   GetCameraParam.srv
   SwitchRectify.srv
   SaveDepth.srv
+  RemoveDark.srv
 )
 
 add_message_files(FILES
@@ -73,7 +74,15 @@ add_executable(feynman_camera
 )
 add_dependencies(feynman_camera ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-target_link_libraries(feynman_camera ${catkin_LIBRARIES} usb-1.0 )
+#pragma comment(lib,"opencv_core453d.lib")
+#pragma comment(lib,"opencv_imgproc453d.lib")
+#pragma comment(lib,"ippicvmt.lib")
+#pragma comment(lib,"IlmImfd.lib")
+#pragma comment(lib,"ippiwd.lib")
+#pragma comment(lib,"ittnotifyd.lib")
+#pragma comment(lib,"zlibd.lib")
+
+target_link_libraries(feynman_camera ${catkin_LIBRARIES} usb-1.0 opencv_core opencv_imgproc)
 add_dependencies(feynman_camera ${PROJECT_NAME}_generate_messages_cpp)
 
 install(TARGETS feynman_camera ${ADDITIONAL_EXECUTABLES}

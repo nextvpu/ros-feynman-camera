@@ -1,0 +1,4 @@
+float32 pixelthreshold
+float32 sigmathreshold
+int32 enableremovedark
+---

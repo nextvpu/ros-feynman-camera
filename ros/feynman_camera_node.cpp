@@ -3,6 +3,7 @@
 #include <string>
 #include <ros/ros.h>
 #include "feynman_camera/SaveDepth.h"
+#include "feynman_camera/RemoveDark.h"
 #include "feynman_camera/SetStreamMode.h"
 #include "feynman_camera/SwitchRectify.h"
 #include "feynman_camera/SetExposure.h"
@@ -21,6 +22,7 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <sensor_msgs/PointCloud2.h>
 #include "ring_queue.h"
+#include <opencv2/opencv.hpp>
 //#include <pcl/ros/conversions.h>
 
 #include <sensor_msgs/Image.h>
@@ -29,6 +31,52 @@
 
 #include <string.h>
 ////////////////////////////////////
+using namespace cv;
+unsigned char *g_leftdepth = NULL;
+
+bool g_removedark = true;
+
+float pixthreshold = 20;
+float sigmathreshold = 30;
+
+int32_t removeDarkOutliers(
+    const cv::Mat &img,
+    cv::Mat &depth,
+    int32_t pixThr,
+    int32_t sigmaThr,
+    int8_t winsize)
+{
+  //img mean
+
+  Mat meanI;
+  boxFilter(img, meanI, -1, Size(winsize, winsize), Point(-1, -1), true, 2);
+
+  //img - mean
+  Mat diff;
+  cv::absdiff(img, meanI, diff); //todo: check: uint8 sub
+
+  //diff square
+  Mat sDiff = diff.mul(diff); //todo: check: mul out of range
+                              //box filter SAD
+  Mat sad;
+  boxFilter(sDiff, sad, -1, Size(winsize, winsize), Point(-1, -1), true, 2);
+  //compare  mask1 mask2
+  Mat mask1, mask2;
+  mask1 = sad < sigmaThr;
+  mask2 = meanI < pixThr;
+  //mask and op
+  Mat mask = mask1 & mask2;
+  Mat nmask;
+  mask.convertTo(nmask, CV_16UC1, 1, 0);
+  //mask box filter
+
+  //compare   //todo:simplify here
+  Mat ndepth;
+  depth.copyTo(ndepth, 255 - mask);
+  depth = ndepth;
+  return 0;
+}
+
 std::vector<s_feynman_cam_param>
     g_cameraparam;
 //0.obtain device id from launch file
@@ -65,6 +113,20 @@ typedef struct
 
 Ring_Queue *taskqueue = NULL;
 
+bool handle_removedark_request(feynman_camera::RemoveDarkRequest &req,
+                               feynman_camera::RemoveDarkResponse &res)
+{
+  if (req.enableremovedark)
+  {
+    g_removedark = true;
+    pixthreshold = (int32_t)(req.pixelthreshold * 255.0);
+    sigmathreshold = (int32_t)(req.sigmathreshold * 255.0);
+  }
+  else
+  {
+    g_removedark = false;
+  }
+}
 bool handle_savedepth_request(feynman_camera::SaveDepthRequest &req,
                               feynman_camera::SaveDepthResponse &res)
 {
@@ -242,8 +304,55 @@ typedef struct
 
 int hasstartpipeline = 0;
 int g_hasgotparam = 0;
+std::vector<FEYNMAN_USBHeaderDataPacket *> g_savedepth;
 void framecallback(void *data, void *userdata)
 {
+
+  DEVICEINFO *info = (DEVICEINFO *)userdata;
+  FEYNMAN_USBHeaderDataPacket *tmppack = (FEYNMAN_USBHeaderDataPacket *)data;
+  if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_DEPTH_IMAGE)
+  {
+    // ROS_INFO("depth data!\n");
+
+    if (g_cameraparam.size() == 1)
+    {
+
+      int width = g_cameraparam[0].img_width;
+      int height = g_cameraparam[0].img_height;
+
+      if (g_leftdepth != NULL && g_removedark)
+      {
+        Mat tempdepth = Mat(height, width, CV_16U, Scalar::all(0));
+        // 循环赋值
+        for (int i = 0; i < height; i++)
+        {
+          for (int j = 0; j < width; j++)
+          {
+            tempdepth.at<uint16_t>(i, j) = *((uint16_t *)(tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER)) + i * width + j);
+          }
+        }
+        Mat templeftraw = Mat(height, width, CV_8U, Scalar::all(0));
+        // 循环赋值
+        for (int i = 0; i < height; i++)
+        {
+          for (int j = 0; j < width; j++)
+          {
+            templeftraw.at<uint8_t>(i, j) = *((uint8_t *)(g_leftdepth) + i * width + j);
+          }
+        }
+        int8_t winsize = 15;
+        removeDarkOutliers(templeftraw, tempdepth, pixthreshold, sigmathreshold, winsize);
+
+        for (int i = 0; i < height; i++)
+        {
+          for (int j = 0; j < width; j++)
+          {
+            *((uint16_t *)(tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER)) + i * width + j) = tempdepth.at<uint16_t>(i, j);
+          }
+        }
+      }
+    }
+  }
   if (NULL == taskqueue)
   {
     taskqueue = new Ring_Queue(9, sizeof(SAVEDEPTHTASK));
@@ -262,24 +371,88 @@ void framecallback(void *data, void *userdata)
 
   if (tmptask != NULL)
   {
+    //save depth and rgb with same groupid
     FEYNMAN_USBHeaderDataPacket *tmppack = (FEYNMAN_USBHeaderDataPacket *)data;
     if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_DEPTH_IMAGE)
     {
       char filename[256];
       FEYNMAN_USB_IMAGE_HEADER *tmpheader = (FEYNMAN_USB_IMAGE_HEADER *)tmppack->data;
-      sprintf(filename, "%s/depth-%u-%llu.raw", tmptask->filepath, tmpheader->group_id, tmpheader->timestamp);
-      printf("filenums:%d,will write file:%s\n", tmptask->filenums, filename);
-      FILE *fp = fopen(filename, "wb");
-      fwrite(tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER), 1, tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER), fp);
-      fclose(fp);
-      tmptask->filenums--;
-      if (tmptask->filenums == 0)
+      bool hasrgb = false;
+      for (int i = 0; i < g_savedepth.size(); i++)
       {
-        free(tmptask);
-        tmptask = NULL;
+        FEYNMAN_USBHeaderDataPacket *mydata = g_savedepth[i];
+        FEYNMAN_USB_IMAGE_HEADER *myheader = (FEYNMAN_USB_IMAGE_HEADER *)mydata->data;
+        if (myheader->group_id == tmpheader->group_id && mydata->sub_type == FEYNMAN_RGB_IMAGE_SINGLE)
+        { //save depth and rgb
+          sprintf(filename, "%s/depth-%u-%llu.raw", tmptask->filepath, tmpheader->group_id, tmpheader->timestamp);
+          printf("filenums:%d,will write file:%s\n", tmptask->filenums, filename);
+          FILE *fp = fopen(filename, "wb");
+          fwrite(tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER), 1, tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER), fp);
+          fclose(fp);
+
+          sprintf(filename, "%s/rgb-%u-%llu.raw", tmptask->filepath, myheader->group_id, myheader->timestamp);
+          printf("filenums:%d,will write file:%s\n", tmptask->filenums, filename);
+          fp = fopen(filename, "wb");
+          fwrite(mydata->data + sizeof(FEYNMAN_USB_IMAGE_HEADER), 1, mydata->len - sizeof(FEYNMAN_USB_IMAGE_HEADER), fp);
+          fclose(fp);
+
+          tmptask->filenums--;
+          if (tmptask->filenums == 0)
+          {
+            free(tmptask);
+            tmptask = NULL;
+          }
+          hasrgb = true;
+          break;
+        }
+      }
+      if (!hasrgb)
+      { //save depth to g_savedepth
+        FEYNMAN_USBHeaderDataPacket *tobesaved = (FEYNMAN_USBHeaderDataPacket *)malloc(sizeof(FEYNMAN_USBHeaderDataPacket) + tmppack->len);
+        memcpy(tobesaved, tmppack, sizeof(FEYNMAN_USBHeaderDataPacket) + tmppack->len);
+        g_savedepth.push_back(tobesaved);
       }
     }
-    return;
+    else if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_RGB_IMAGE_SINGLE)
+    {
+      char filename[256];
+      FEYNMAN_USB_IMAGE_HEADER *tmpheader = (FEYNMAN_USB_IMAGE_HEADER *)tmppack->data;
+      bool hasdepth = false;
+      for (int i = 0; i < g_savedepth.size(); i++)
+      {
+        FEYNMAN_USBHeaderDataPacket *mydata = g_savedepth[i];
+        FEYNMAN_USB_IMAGE_HEADER *myheader = (FEYNMAN_USB_IMAGE_HEADER *)mydata->data;
+        if (myheader->group_id == tmpheader->group_id && mydata->sub_type == FEYNMAN_DEPTH_IMAGE)
+        { //save depth and rgb
+          sprintf(filename, "%s/rgb-%u-%llu.raw", tmptask->filepath, tmpheader->group_id, tmpheader->timestamp);
+          printf("filenums:%d,will write file:%s\n", tmptask->filenums, filename);
+          FILE *fp = fopen(filename, "wb");
+          fwrite(tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER), 1, tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER), fp);
+          fclose(fp);
+
+          sprintf(filename, "%s/depth-%u-%llu.raw", tmptask->filepath, myheader->group_id, myheader->timestamp);
+          printf("filenums:%d,will write file:%s\n", tmptask->filenums, filename);
+          fp = fopen(filename, "wb");
+          fwrite(mydata->data + sizeof(FEYNMAN_USB_IMAGE_HEADER), 1, mydata->len - sizeof(FEYNMAN_USB_IMAGE_HEADER), fp);
+          fclose(fp);
+
+          tmptask->filenums--;
+          if (tmptask->filenums == 0)
+          {
+            free(tmptask);
+            tmptask = NULL;
+          }
+          hasdepth = true;
+          break;
+        }
+      }
+      if (!hasdepth)
+      { //save depth to g_savedepth
+        FEYNMAN_USBHeaderDataPacket *tobesaved = (FEYNMAN_USBHeaderDataPacket *)malloc(sizeof(FEYNMAN_USBHeaderDataPacket) + tmppack->len);
+        memcpy(tobesaved, tmppack, sizeof(FEYNMAN_USBHeaderDataPacket) + tmppack->len);
+        g_savedepth.push_back(tobesaved);
+      }
+    }
   }
 
   if (hasstartpipeline == 0)
@@ -301,8 +474,6 @@ void framecallback(void *data, void *userdata)
     feynman_getcamparam(100);
   }
 
-  DEVICEINFO *info = (DEVICEINFO *)userdata;
-  FEYNMAN_USBHeaderDataPacket *tmppack = (FEYNMAN_USBHeaderDataPacket *)data;
   if (tmppack->type == FEYNMAN_DEVICE_DATA && tmppack->sub_type == FEYNMAN_DEVICE_DATA_ALL)
   {
     s_feynman_device_info *tmpinfo = (s_feynman_device_info *)tmppack->data;
@@ -523,6 +694,16 @@ void framecallback(void *data, void *userdata)
     //ROS_INFO("depth left raw!\n");
     if (g_cameraparam.size() == 1)
     {
+      unsigned char *tmpimgdata = tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER);
+      int width = g_cameraparam[0].img_width;
+      int height = g_cameraparam[0].img_height;
+
+      if (g_leftdepth == NULL)
+      {
+        g_leftdepth = (uint8_t *)malloc(1280 * 800);
+      }
+      memcpy(g_leftdepth, tmpimgdata, width * height);
+
       s_feynman_cam_param theparam = g_cameraparam[0];
       sensor_msgs::Image new_image;
 
@@ -536,13 +717,10 @@ void framecallback(void *data, void *userdata)
       std::size_t data_size = new_image.step * new_image.height;
       new_image.data.resize(data_size);
 
-      int width = new_image.width;
-      int height = new_image.height;
       static unsigned char *rgb = NULL;
       //   printf("will malloc in depth left raw!\n");
       if (NULL == rgb)
         rgb = (unsigned char *)malloc(width * height * 3);
-      unsigned char *tmpimgdata = tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER);
       for (int row = 0; row < height; row++)
       {
         for (int col = 0; col < width; col++)
@@ -605,6 +783,10 @@ void framecallback(void *data, void *userdata)
 
     if (g_cameraparam.size() == 1)
     {
+
+      int width = g_cameraparam[0].img_width;
+      int height = g_cameraparam[0].img_height;
+
       //   printf("will depthraw publish!\n");
       s_feynman_cam_param theparam = g_cameraparam[0];
       sensor_msgs::Image *new_image = new sensor_msgs::Image;
@@ -674,8 +856,6 @@ void framecallback(void *data, void *userdata)
       pcloud->height = theparam.img_height; //此处也可以为cloud.width = 4; cloud.height = 2;
                                             //   printf("will resize points!\n");
       pcloud->points.resize(pcloud->width * pcloud->height);
-      int width = pcloud->width;
-      int height = pcloud->height;
 
       static uint16_t *depthrgbmask = (uint16_t *)malloc(width * height * sizeof(uint16_t));
       static uint8_t *depthrgbmaskview = (uint8_t *)malloc(width * height * 3);
@@ -942,6 +1122,10 @@ int main(int argc, char *argv[])
   sprintf(tmpparamsstr, "feynman_camera/%d/savedepth", device_id);
 
   ros::ServiceServer savedepthservice = node_obj.advertiseService(tmpparamsstr, handle_savedepth_request);
+
+  sprintf(tmpparamsstr, "feynman_camera/%d/removedark", device_id);
+
+  ros::ServiceServer removedarkservice = node_obj.advertiseService(tmpparamsstr, handle_removedark_request);
 
   sprintf(tmpparamsstr, "feynman_camera/%d/switchrectify", device_id);
 
