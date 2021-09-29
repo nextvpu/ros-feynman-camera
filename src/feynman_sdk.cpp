@@ -41,9 +41,12 @@ typedef struct _pkt_info_custom_t
 	int len;
 } pkt_info_custom_t;
 
-static Ring_Queue *rawpktqueue = NULL;
-static Ring_Queue *imgpktqueue = NULL;
+static Ring_Queue *otherpktqueue = NULL;
+static Ring_Queue *depthpktqueue = NULL;
+static Ring_Queue *irpktqueue = NULL;
+static Ring_Queue *rgbpktqueue = NULL;
 static Ring_Queue *imupktqueue = NULL;
+static Ring_Queue *savepktqueue = NULL;
 static Ring_Queue *sendqueue = NULL;
 ////////////////////
 const unsigned char colortable[256][3] = {{16, 128, 128},
@@ -828,7 +831,7 @@ static void on_usb_data_receive(uint8_t *data, int len, FRAMECALLBACK callback)
 		return;
 	}
 
-	if (tmppack->type == FEYNMAN_COMMAND_DATA)
+	/*	if (tmppack->type == FEYNMAN_COMMAND_DATA)
 	{ //&&tmppack->sub_type== FEYNMAN_COMMAND_GET_DEVICE_SN_RETURN) {
 		if (tmppack->sub_type == FEYNMAN_COMMAND_GET_DEPTH_CONFIGURATION_RETURN ||
 			tmppack->sub_type == FEYNMAN_COMMAND_SET_DEPTH_CONFIGURATION_RETURN)
@@ -846,19 +849,113 @@ static void on_usb_data_receive(uint8_t *data, int len, FRAMECALLBACK callback)
 	{
 		callback(tmppack, connectuserdata);
 	}
-	else if (tmppack->type == FEYNMAN_IMAGE_DATA)
-	{
-		if (NULL == imgpktqueue)
+	else */
+	if (tmppack->type == FEYNMAN_IMAGE_DATA)
+	{ //here,we will save data to rgb/depth/ir/save queue
+		if (NULL == rgbpktqueue)
 		{
-			imgpktqueue = new Ring_Queue(9, sizeof(pkt_info_custom_t));
+			rgbpktqueue = new Ring_Queue(32, sizeof(pkt_info_custom_t));
 		}
+		if (NULL == depthpktqueue)
+		{
+			depthpktqueue = new Ring_Queue(32, sizeof(pkt_info_custom_t));
+		}
+		if (NULL == irpktqueue)
+		{
+			irpktqueue = new Ring_Queue(32, sizeof(pkt_info_custom_t));
+		}
+		if (NULL == savepktqueue)
+		{
+			savepktqueue = new Ring_Queue(32, sizeof(pkt_info_custom_t));
+		}
+
 		pkt_info_custom_t *p = 0;
-		p = (pkt_info_custom_t *)imgpktqueue->SOLO_Write();
+		p = (pkt_info_custom_t *)savepktqueue->SOLO_Write();
 		if (p)
 		{
 			p->len = len;
 			memcpy((unsigned char *)p->buffer, data, len);
-			imgpktqueue->SOLO_Write_Over();
+			savepktqueue->SOLO_Write_Over();
+		}
+		else
+		{
+			printf("fail image one!\n");
+		}
+
+		if (tmppack->sub_type == FEYNMAN_DEPTH_IMAGE)
+		{
+			pkt_info_custom_t *p = 0;
+			p = (pkt_info_custom_t *)depthpktqueue->SOLO_Write();
+			if (p)
+			{
+				p->len = len;
+				memcpy((unsigned char *)p->buffer, data, len);
+				depthpktqueue->SOLO_Write_Over();
+			}
+			else
+			{
+				printf("fail image one!\n");
+			}
+		}
+		if (tmppack->sub_type == FEYNMAN_DEPTH_IMAGE_LEFT_RAW)
+		{
+			pkt_info_custom_t *p = 0;
+			p = (pkt_info_custom_t *)depthpktqueue->SOLO_Write();
+			if (p)
+			{
+				p->len = len;
+				memcpy((unsigned char *)p->buffer, data, len);
+				depthpktqueue->SOLO_Write_Over();
+			}
+			else
+			{
+				printf("fail image one!\n");
+			}
+			p = (pkt_info_custom_t *)irpktqueue->SOLO_Write();
+			if (p)
+			{
+				p->len = len;
+				memcpy((unsigned char *)p->buffer, data, len);
+				irpktqueue->SOLO_Write_Over();
+			}
+			else
+			{
+				printf("fail image one!\n");
+			}
+		}
+		if (tmppack->sub_type == FEYNMAN_DEPTH_IMAGE_RIGHT_RAW ||
+			tmppack->sub_type == FEYNMAN_IR_IMAGE_LEFT_VI ||
+			tmppack->sub_type == FEYNMAN_IR_IMAGE_RIGHT_VI ||
+			tmppack->sub_type == FEYNMAN_IR_IMAGE_LEFT_VPSS ||
+			tmppack->sub_type == FEYNMAN_IR_IMAGE_RIGHT_VPSS)
+		{
+			pkt_info_custom_t *p = 0;
+			p = (pkt_info_custom_t *)irpktqueue->SOLO_Write();
+			if (p)
+			{
+				p->len = len;
+				memcpy((unsigned char *)p->buffer, data, len);
+				irpktqueue->SOLO_Write_Over();
+			}
+			else
+			{
+				printf("fail image one!\n");
+			}
+		}
+		if (tmppack->sub_type == FEYNMAN_RGB_IMAGE_SINGLE)
+		{
+			pkt_info_custom_t *p = 0;
+			p = (pkt_info_custom_t *)rgbpktqueue->SOLO_Write();
+			if (p)
+			{
+				p->len = len;
+				memcpy((unsigned char *)p->buffer, data, len);
+				rgbpktqueue->SOLO_Write_Over();
+			}
+			else
+			{
+				printf("fail image one!\n");
+			}
 		}
 	}
 	else if (tmppack->type == FEYNMAN_IMU_DATA)
@@ -878,7 +975,9 @@ static void on_usb_data_receive(uint8_t *data, int len, FRAMECALLBACK callback)
 	}
 	else
 	{
-		if (NULL == rawpktqueue)
+
+		callback(tmppack, connectuserdata);
+		/*		if (NULL == rawpktqueue)
 		{
 			rawpktqueue = new Ring_Queue(9, sizeof(pkt_info_custom_t));
 		}
@@ -889,225 +988,63 @@ static void on_usb_data_receive(uint8_t *data, int len, FRAMECALLBACK callback)
 			p->len = len;
 			memcpy((unsigned char *)p->buffer, data, len);
 			rawpktqueue->SOLO_Write_Over();
-		}
+		}*/
 	}
-}
-static void on_imu_data_process(uint8_t *data, int len, FRAMECALLBACK callback)
-{
-	if (len < sizeof(FEYNMAN_USBHeaderDataPacket))
-	{
-		printf("data too short:%d<=%d\n", len, sizeof(FEYNMAN_USBHeaderDataPacket));
-		return;
-	}
-
-	if (0 != strncmp("NEXT_VPU", (const char *)data, strlen("NEXT_VPU")))
-	{
-		printf("first 8 character is not NEXT_VPU!\n");
-		return;
-	}
-	FEYNMAN_USBHeaderDataPacket *tmppack = (FEYNMAN_USBHeaderDataPacket *)data;
-	if (tmppack->len != (len - sizeof(FEYNMAN_USBHeaderDataPacket)))
-	{
-		printf("len not equal:%d,%d\n", len - sizeof(FEYNMAN_USBHeaderDataPacket), tmppack->len);
-		return;
-	}
-	if (tmppack->type == FEYNMAN_IMU_DATA)
-	{
-		callback(tmppack, connectuserdata);
-	}
-}
-static void on_img_data_process(uint8_t *data, int len, FRAMECALLBACK callback)
-{
-	if (len < sizeof(FEYNMAN_USBHeaderDataPacket))
-	{
-		printf("data too short:%d<=%d\n", len, sizeof(FEYNMAN_USBHeaderDataPacket));
-		return;
-	}
-
-	if (0 != strncmp("NEXT_VPU", (const char *)data, strlen("NEXT_VPU")))
-	{
-		printf("first 8 character is not NEXT_VPU!\n");
-		return;
-	}
-	FEYNMAN_USBHeaderDataPacket *tmppack = (FEYNMAN_USBHeaderDataPacket *)data;
-	if (tmppack->len != (len - sizeof(FEYNMAN_USBHeaderDataPacket)))
-	{
-		printf("len not equal:%d,%d\n", len - sizeof(FEYNMAN_USBHeaderDataPacket), tmppack->len);
-		return;
-	}
-	if (tmppack->type == FEYNMAN_IMAGE_DATA)
-	{
-		callback(tmppack, connectuserdata);
-	}
-}
-static void on_usb_data_process(uint8_t *data, int len, FRAMECALLBACK callback)
-{
-	/////////////////////////////����ֱ�ӷ���������õ�g_msg_receive
-	//0-3 NVPU   4
-	//4-5 type ���ֽ���ǰ  2
-	//6-7 subtype ���ֽ���ǰ  2
-	//8-11 checksum ���ֽ���ǰ  4
-	//12-15 length ���ֽ���ǰ  4
-	//16-   data
-	/*
-	typedef struct {
-	uint8_t     magic[8];  //"NEXT_VPU"
-	uint16_t    type;
-	uint16_t    sub_type;
-	uint32_t    checksum;
-	uint32_t    len;       //len < FEYNMAN_ONE_PACKET_DATA_MAX_SIZE value
-	uint8_t     data[1];
-	}FEYNMAN_USBHeaderDataPacket;
-	*/
-
-	if (len < sizeof(FEYNMAN_USBHeaderDataPacket))
-	{
-		printf("data too short:%d<=%d\n", len, sizeof(FEYNMAN_USBHeaderDataPacket));
-		return;
-	}
-
-	if (0 != strncmp("NEXT_VPU", (const char *)data, strlen("NEXT_VPU")))
-	{
-		printf("first 8 character is not NEXT_VPU!\n");
-		return;
-	}
-	FEYNMAN_USBHeaderDataPacket *tmppack = (FEYNMAN_USBHeaderDataPacket *)data;
-	if (tmppack->len != (len - sizeof(FEYNMAN_USBHeaderDataPacket)))
-	{
-		printf("len not equal:%d,%d\n", len - sizeof(FEYNMAN_USBHeaderDataPacket), tmppack->len);
-		return;
-	}
-	//printf("got data len:%d\n", len - 16);
-	//	printf("type:%d,sub_type:%d\n", tmppack->type, tmppack->sub_type);
-	/*	if (tmppack->type == FEYNMAN_IMAGE_DATA)
-	{
-		callback(tmppack, connectuserdata);
-	}
-	else if (tmppack->type == FEYNMAN_IMU_DATA)
-	{
-		callback(tmppack, connectuserdata);
-	}
-	else*/
-	if (tmppack->type == FEYNMAN_DEVICE_DATA)
-	{
-		callback(tmppack, connectuserdata);
-	}
-	else if (tmppack->type == FEYNMAN_UPGRADE_DATA)
-	{
-		usb_upgrade_callback((FEYNMAN_UPGRADE_SUB_TYPE)tmppack->sub_type, tmppack->data, tmppack->len);
-	}
-
-	/*
-	uint32_t temp;
-
-	for (int i = 0; i < len; i++)
-	{
-	switch (g_msg_receive->current_step)
-	{
-	case(CURRENT_STEP_RECEIVE_MAGIC):
-	{
-	g_msg_receive->packet.magic[g_msg_receive->data_received++] = data[i];
-
-	if (g_msg_receive->data_received == 4)
-	{
-	if ((g_msg_receive->packet.magic[0] == 'N') &&
-	(g_msg_receive->packet.magic[1] == 'V') &&
-	(g_msg_receive->packet.magic[2] == 'P') &&
-	(g_msg_receive->packet.magic[3] == 'U'))
-	{
-	g_msg_receive->current_step = CURRENT_STEP_RECEIVE_TYPE;
-	g_msg_receive->data_received = 0;
-	}
-	else
-	{
-	memcpy((void*)g_msg_receive->packet.magic, (void*)&g_msg_receive->packet.magic[1], 3);
-	g_msg_receive->data_received--;
-	}
-	}
-	}
-	break;
-
-	case(CURRENT_STEP_RECEIVE_TYPE):
-	{
-	temp = data[i];
-	temp <<= g_msg_receive->data_received * 8;
-	g_msg_receive->packet.type |= temp;
-	g_msg_receive->data_received++;
-	if (g_msg_receive->data_received == 2)
-	{
-	g_msg_receive->current_step = CURRENT_STEP_RECEIVE_SUB_TYPE;
-	g_msg_receive->data_received = 0;
-	}
-	}
-	break;
-
-	case(CURRENT_STEP_RECEIVE_SUB_TYPE):
-	{
-	temp = data[i];
-	temp <<= g_msg_receive->data_received * 8;
-	g_msg_receive->packet.sub_type |= temp;
-	g_msg_receive->data_received++;
-	if (g_msg_receive->data_received == 2)
-	{
-	g_msg_receive->current_step = CURRENT_STEP_RECEIVE_CHECK_SUM;
-	g_msg_receive->data_received = 0;
-	}
-	}
-	break;
-
-	case(CURRENT_STEP_RECEIVE_CHECK_SUM):
-	{
-	temp = data[i];
-	temp <<= g_msg_receive->data_received * 8;
-	g_msg_receive->packet.checksum |= temp;
-	g_msg_receive->data_received++;
-	if (g_msg_receive->data_received == 4)
-	{
-	g_msg_receive->current_step = CURRENT_STEP_RECEIVE_LEN;
-	g_msg_receive->data_received = 0;
-	}
-	}
-	break;
-
-	case(CURRENT_STEP_RECEIVE_LEN):
-	{
-	temp = data[i];
-	temp <<= g_msg_receive->data_received * 8;
-	g_msg_receive->packet.len |= temp;
-	g_msg_receive->data_received++;
-	if (g_msg_receive->data_received == 4)
-	{
-	g_msg_receive->current_step = CURRENT_STEP_RECEIVE_DATA;
-	g_msg_receive->data_received = 0;
-	if (g_msg_receive->packet.len == 0)
-	{
-	on_usb_packet_received(&g_msg_receive->packet);
-	memset(&g_msg_receive, 0, sizeof(SMsg));
-	}
-	}
-	}
-	break;
-
-	case(CURRENT_STEP_RECEIVE_DATA):
-	{
-	g_msg_receive->packet.data[g_msg_receive->data_received++] = data[i];
-	if (g_msg_receive->packet.len == g_msg_receive->data_received)
-	{
-	g_msg_receive->current_step = CURRENT_STEP_RECEIVE_MAGIC;
-	g_msg_receive->data_received = 0;
-	on_usb_packet_received(&g_msg_receive->packet);
-	memset(&g_msg_receive, 0, sizeof(SMsg));
-	}
-	}
-	break;
-	default:
-	break;
-	}
-	}
-	*/
 }
 
 //pthread_cond_t  g_cond  = PTHREAD_COND_INITIALIZER;
+
+#ifdef _WINDOWS
+static unsigned __stdcall saveprocessthread(void *param)
+{
+#else
+static void *saveprocessthread(void *param)
+{
+#endif
+	FRAMECALLBACK callback = (FRAMECALLBACK)param;
+	if (NULL == savepktqueue)
+	{
+		savepktqueue = new Ring_Queue(9, sizeof(pkt_info_custom_t));
+	}
+
+#ifdef _WINDOWS
+	HANDLE waitevent = ::CreateEvent(NULL, FALSE, FALSE, NULL);
+#endif
+	while (g_thread_running_flag)
+	{
+		pkt_info_custom_t *p = 0;
+		p = (pkt_info_custom_t *)savepktqueue->SOLO_Read();
+		if (p)
+		{
+			int len = p->len;
+			uint8_t *tmpbuf = (uint8_t *)malloc(len);
+			memcpy(tmpbuf, (unsigned char *)p->buffer, len);
+			savepktqueue->SOLO_Read_Over();
+
+			callback(tmpbuf, connectuserdata);
+			free(tmpbuf);
+		}
+		else
+		{
+#ifdef _WINDOWS
+			WaitForSingleObject(waitevent, 5);
+#else
+			/*	struct timeval now;
+			struct timespec outtime;
+			gettimeofday(&now, NULL);
+			outtime.tv_sec = now.tv_sec + 5;
+			outtime.tv_nsec = now.tv_usec * 1000; 
+    		int ret = pthread_cond_timedwait(&g_cond,NULL, &outtime);*/
+			usleep(1000 * 1);
+#endif
+		}
+	}
+
+#ifdef _WINDOWS
+	CloseHandle(waitevent);
+#endif
+	return 0;
+}
 
 #ifdef _WINDOWS
 static unsigned __stdcall imuprocessthread(void *param)
@@ -1136,7 +1073,165 @@ static void *imuprocessthread(void *param)
 			memcpy(tmpbuf, (unsigned char *)p->buffer, len);
 			imupktqueue->SOLO_Read_Over();
 
-			on_imu_data_process(tmpbuf, len, callback);
+			callback(tmpbuf, connectuserdata);
+			free(tmpbuf);
+		}
+		else
+		{
+#ifdef _WINDOWS
+			WaitForSingleObject(waitevent, 5);
+#else
+			/*	struct timeval now;
+			struct timespec outtime;
+			gettimeofday(&now, NULL);
+			outtime.tv_sec = now.tv_sec + 5;
+			outtime.tv_nsec = now.tv_usec * 1000; 
+    		int ret = pthread_cond_timedwait(&g_cond,NULL, &outtime);*/
+			usleep(1000 * 1);
+#endif
+		}
+	}
+
+#ifdef _WINDOWS
+	CloseHandle(waitevent);
+#endif
+	return 0;
+}
+
+#ifdef _WINDOWS
+static unsigned __stdcall rgbprocessthread(void *param)
+{
+#else
+static void *
+rgbprocessthread(void *param)
+{
+#endif
+	FRAMECALLBACK callback = (FRAMECALLBACK)param;
+	if (NULL == rgbpktqueue)
+	{
+		rgbpktqueue = new Ring_Queue(32, sizeof(pkt_info_custom_t));
+	}
+
+#ifdef _WINDOWS
+	HANDLE waitevent = ::CreateEvent(NULL, FALSE, FALSE, NULL);
+#endif
+	while (g_thread_running_flag)
+	{
+		pkt_info_custom_t *p = 0;
+		p = (pkt_info_custom_t *)rgbpktqueue->SOLO_Read();
+		if (p)
+		{
+			int len = p->len;
+			uint8_t *tmpbuf = (uint8_t *)malloc(len);
+			memcpy(tmpbuf, (unsigned char *)p->buffer, len);
+			rgbpktqueue->SOLO_Read_Over();
+
+			callback(tmpbuf, connectuserdata);
+			free(tmpbuf);
+		}
+		else
+		{
+#ifdef _WINDOWS
+			WaitForSingleObject(waitevent, 5);
+#else
+			/*	struct timeval now;
+			struct timespec outtime;
+			gettimeofday(&now, NULL);
+			outtime.tv_sec = now.tv_sec + 5;
+			outtime.tv_nsec = now.tv_usec * 1000; 
+    		int ret = pthread_cond_timedwait(&g_cond,NULL, &outtime);*/
+			usleep(1000 * 1);
+#endif
+		}
+	}
+
+#ifdef _WINDOWS
+	CloseHandle(waitevent);
+#endif
+	return 0;
+}
+
+#ifdef _WINDOWS
+static unsigned __stdcall irprocessthread(void *param)
+{
+#else
+static void *
+irprocessthread(void *param)
+{
+#endif
+	FRAMECALLBACK callback = (FRAMECALLBACK)param;
+	if (NULL == irpktqueue)
+	{
+		irpktqueue = new Ring_Queue(32, sizeof(pkt_info_custom_t));
+	}
+
+#ifdef _WINDOWS
+	HANDLE waitevent = ::CreateEvent(NULL, FALSE, FALSE, NULL);
+#endif
+	while (g_thread_running_flag)
+	{
+		pkt_info_custom_t *p = 0;
+		p = (pkt_info_custom_t *)irpktqueue->SOLO_Read();
+		if (p)
+		{
+			int len = p->len;
+			uint8_t *tmpbuf = (uint8_t *)malloc(len);
+			memcpy(tmpbuf, (unsigned char *)p->buffer, len);
+			irpktqueue->SOLO_Read_Over();
+
+			callback(tmpbuf, connectuserdata);
+			free(tmpbuf);
+		}
+		else
+		{
+#ifdef _WINDOWS
+			WaitForSingleObject(waitevent, 5);
+#else
+			/*	struct timeval now;
+			struct timespec outtime;
+			gettimeofday(&now, NULL);
+			outtime.tv_sec = now.tv_sec + 5;
+			outtime.tv_nsec = now.tv_usec * 1000; 
+    		int ret = pthread_cond_timedwait(&g_cond,NULL, &outtime);*/
+			usleep(1000 * 1);
+#endif
+		}
+	}
+
+#ifdef _WINDOWS
+	CloseHandle(waitevent);
+#endif
+	return 0;
+}
+
+#ifdef _WINDOWS
+static unsigned __stdcall depthprocessthread(void *param)
+{
+#else
+static void *depthprocessthread(void *param)
+{
+#endif
+	FRAMECALLBACK callback = (FRAMECALLBACK)param;
+	if (NULL == depthpktqueue)
+	{
+		depthpktqueue = new Ring_Queue(32, sizeof(pkt_info_custom_t));
+	}
+
+#ifdef _WINDOWS
+	HANDLE waitevent = ::CreateEvent(NULL, FALSE, FALSE, NULL);
+#endif
+	while (g_thread_running_flag)
+	{
+		pkt_info_custom_t *p = 0;
+		p = (pkt_info_custom_t *)depthpktqueue->SOLO_Read();
+		if (p)
+		{
+			int len = p->len;
+			uint8_t *tmpbuf = (uint8_t *)malloc(len);
+			memcpy(tmpbuf, (unsigned char *)p->buffer, len);
+			depthpktqueue->SOLO_Read_Over();
+
+			callback(tmpbuf, connectuserdata);
 			free(tmpbuf);
 		}
 		else
@@ -1161,16 +1256,16 @@ static void *imuprocessthread(void *param)
 	return 0;
 }
 #ifdef _WINDOWS
-static unsigned __stdcall imgprocessthread(void *param)
+static unsigned __stdcall otherprocessthread(void *param)
 {
 #else
-static void *imgprocessthread(void *param)
+static void *otherprocessthread(void *param)
 {
 #endif
 	FRAMECALLBACK callback = (FRAMECALLBACK)param;
-	if (NULL == imgpktqueue)
+	if (NULL == otherpktqueue)
 	{
-		imgpktqueue = new Ring_Queue(9, sizeof(pkt_info_custom_t));
+		otherpktqueue = new Ring_Queue(9, sizeof(pkt_info_custom_t));
 	}
 
 #ifdef _WINDOWS
@@ -1179,66 +1274,15 @@ static void *imgprocessthread(void *param)
 	while (g_thread_running_flag)
 	{
 		pkt_info_custom_t *p = 0;
-		p = (pkt_info_custom_t *)imgpktqueue->SOLO_Read();
+		p = (pkt_info_custom_t *)otherpktqueue->SOLO_Read();
 		if (p)
 		{
 			int len = p->len;
 			uint8_t *tmpbuf = (uint8_t *)malloc(len);
 			memcpy(tmpbuf, (unsigned char *)p->buffer, len);
-			imgpktqueue->SOLO_Read_Over();
+			otherpktqueue->SOLO_Read_Over();
 
-			on_img_data_process(tmpbuf, len, callback);
-			free(tmpbuf);
-		}
-		else
-		{
-#ifdef _WINDOWS
-			WaitForSingleObject(waitevent, 5);
-#else
-			/*	struct timeval now;
-			struct timespec outtime;
-			gettimeofday(&now, NULL);
-			outtime.tv_sec = now.tv_sec + 5;
-			outtime.tv_nsec = now.tv_usec * 1000; 
-    		int ret = pthread_cond_timedwait(&g_cond,NULL, &outtime);*/
-			usleep(1000 * 1);
-#endif
-		}
-	}
-
-#ifdef _WINDOWS
-	CloseHandle(waitevent);
-#endif
-	return 0;
-}
-#ifdef _WINDOWS
-static unsigned __stdcall dataprocessthread(void *param)
-{
-#else
-static void *dataprocessthread(void *param)
-{
-#endif
-	FRAMECALLBACK callback = (FRAMECALLBACK)param;
-	if (NULL == rawpktqueue)
-	{
-		rawpktqueue = new Ring_Queue(9, sizeof(pkt_info_custom_t));
-	}
-
-#ifdef _WINDOWS
-	HANDLE waitevent = ::CreateEvent(NULL, FALSE, FALSE, NULL);
-#endif
-	while (g_thread_running_flag)
-	{
-		pkt_info_custom_t *p = 0;
-		p = (pkt_info_custom_t *)rawpktqueue->SOLO_Read();
-		if (p)
-		{
-			int len = p->len;
-			uint8_t *tmpbuf = (uint8_t *)malloc(len);
-			memcpy(tmpbuf, (unsigned char *)p->buffer, len);
-			rawpktqueue->SOLO_Read_Over();
-
-			on_usb_data_process(tmpbuf, len, callback);
+			callback(tmpbuf, connectuserdata);
 			free(tmpbuf);
 		}
 		else
@@ -1402,7 +1446,7 @@ static BOOL s_hasconnect = FALSE;
 static HANDLE recvthread, processthread;
 static HANDLE sendthread;
 #else
-static pthread_t recvthread, processthread, processimgthread, processimuthread, sendthread;
+static pthread_t recvthread, depththread, rgbthread, imuthread, irthread, savethread, sendthread;
 #endif
 void feynman_disconnectcamera()
 {
@@ -1417,9 +1461,11 @@ void feynman_disconnectcamera()
 		printf("ret:%d:%d\n", retfirst, retsecond, retthird);
 #else
 		pthread_join(recvthread, NULL);
-		pthread_join(processthread, NULL);
-		pthread_join(processimgthread, NULL);
-		pthread_join(processimuthread, NULL);
+		pthread_join(irthread, NULL);
+		pthread_join(rgbthread, NULL);
+		pthread_join(imuthread, NULL);
+		pthread_join(depththread, NULL);
+		pthread_join(savethread, NULL);
 		pthread_join(sendthread, NULL);
 #endif
 	}
@@ -1553,7 +1599,14 @@ unsigned int feynman_connectcameraforid(const char *devicename)
 	return 0xffffffff;
 }
 
-BOOL feynman_connectcamera(const char *devicename, FRAMECALLBACK framecallback, void *userdata)
+BOOL feynman_connectcamera(const char *devicename,
+						   FRAMECALLBACK imucallback,	//only imu
+						   FRAMECALLBACK savecallback,	//all image data
+						   FRAMECALLBACK depthcallback, //only depth and depth's left ir
+						   FRAMECALLBACK ircallback,	//only ir left and right
+						   FRAMECALLBACK rgbcallback,	//only rgb and depth
+						   FRAMECALLBACK othercallback, //cnn and log and other
+						   void *userdata)
 {
 	int ret = -1;
 	//pthread_t pid;
@@ -1577,7 +1630,6 @@ BOOL feynman_connectcamera(const char *devicename, FRAMECALLBACK framecallback, 
 	device = atoi(split_buf[2]);
 	free(msg);
 
-	FRAMECALLBACK callback = (FRAMECALLBACK)framecallback;
 	connectuserdata = userdata;
 
 	if (usb_hal_open(bus, device) >= 0)
@@ -1596,10 +1648,12 @@ BOOL feynman_connectcamera(const char *devicename, FRAMECALLBACK framecallback, 
 		sendthread = (HANDLE)_beginthreadex(NULL, 0, usb_loop_send, (LPVOID)NULL, 0, &threadID);
 #else
 		//	pthread_t threadID;
-		pthread_create(&recvthread, 0, usb_loop_recv, (void *)callback);
-		pthread_create(&processthread, 0, dataprocessthread, (void *)callback);
-		pthread_create(&processimgthread, 0, imgprocessthread, (void *)callback);
-		pthread_create(&processimuthread, 0, imuprocessthread, (void *)callback);
+		pthread_create(&recvthread, 0, usb_loop_recv, (void *)othercallback);
+		pthread_create(&depththread, 0, depthprocessthread, (void *)depthcallback);
+		pthread_create(&irthread, 0, irprocessthread, (void *)ircallback);
+		pthread_create(&rgbthread, 0, rgbprocessthread, (void *)rgbcallback);
+		pthread_create(&imuthread, 0, imuprocessthread, (void *)imucallback);
+		pthread_create(&savethread, 0, saveprocessthread, (void *)savecallback);
 		pthread_create(&sendthread, 0, usb_loop_send, (void *)0);
 #endif
 		s_hasconnect = TRUE;

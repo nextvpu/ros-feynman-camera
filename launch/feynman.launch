@@ -4,6 +4,6 @@
         type="feynman_camera"
         output="screen"
         required="true">
-    <param name="device_id" value="4000" />
+    <param name="device_id" value="305419896" />
   </node>
 </launch>

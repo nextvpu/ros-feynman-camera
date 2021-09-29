@@ -685,7 +685,14 @@ extern "C"
 	*
 	* @endcode
 	*/
-	BOOL feynman_connectcamera(const char *devicename, FRAMECALLBACK framecallback, void *userdata);
+	BOOL feynman_connectcamera(const char *devicename,
+							   FRAMECALLBACK imucallback,	//only imu
+							   FRAMECALLBACK savecallback,	//all image data
+							   FRAMECALLBACK depthcallback, //only depth and depth's left ir
+							   FRAMECALLBACK ircallback,	//only ir left and right
+							   FRAMECALLBACK rgbcallback,	//only rgb and depth
+							   FRAMECALLBACK othercallback, //cnn and log and other
+							   void *userdata);
 
 	/**
 	* @brief		disconnect feynman device
