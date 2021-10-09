@@ -1,7 +1,20 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(feynman_camera)
 
-find_package(catkin REQUIRED camera_info_manager dynamic_reconfigure sensor_msgs roscpp message_generation)
+find_package(catkin REQUIRED COMPONENTS
+      camera_info_manager
+      dynamic_reconfigure 
+      sensor_msgs
+      roscpp
+      message_generation
+      rospy
+      std_msgs
+)
+## Generate dynamic reconfigure parameters in the 'cfg' folder
+generate_dynamic_reconfigure_options(
+      cfg/resfps.cfg
+)
+   
 SET(CMAKE_CXX_FLAGS "-g")
 #MACHINE = $(shell uname -m)
 execute_process(COMMAND uname -m  OUTPUT_VARIABLE  MACHINES )
@@ -57,7 +70,8 @@ generate_messages(
 
 catkin_package(
   INCLUDE_DIRS include
-  CATKIN_DEPENDS camera_info_manager dynamic_reconfigure  sensor_msgs roscpp message_runtime
+  LIBRARIES feynman_camera
+  CATKIN_DEPENDS rospy std_msgs camera_info_manager dynamic_reconfigure  sensor_msgs roscpp message_runtime
   
 )
 

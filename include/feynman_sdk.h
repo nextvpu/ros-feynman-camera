@@ -196,8 +196,10 @@ extern "C"
 	typedef enum
 	{
 		FEYNMAN_RESOLUTION_1280_800, /**< resolution 1280x800 0 */
-		FEYNMAN_RESOLUTION_1280_720, /**< resolution 1280x800 1 */
-		FEYNMAN_RESOLUTION_640_480,	 /**< resolution 1280x800 2 */
+		FEYNMAN_RESOLUTION_1280_720, /**< resolution 1280x720 1 */
+		FEYNMAN_RESOLUTION_640_480,	 /**< resolution 640x480 2 */
+		FEYNMAN_RESOLUTION_640_400,	 /**< resolution 640x400 3 */
+		FEYNMAN_RESOLUTION_320_200,	 /**< resolution 320x200 4 */
 	} FEYNMAN_SENSOR_RESOLUTION_TYPE;
 
 	/** FEYNMAN_DEVICE_DATASUB_TYPE */

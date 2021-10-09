@@ -15,6 +15,8 @@
 #include "feynman_camera/imu_info.h"
 #include "feynman_camera/cnn_box.h"
 #include "feynman_camera/cnn_info.h"
+#include <dynamic_reconfigure/server.h>
+#include "feynman_camera/resfpsConfig.h"
 #include "yuv_rgb.h"
 #include <std_msgs/String.h>
 #include <pcl/point_types.h>
@@ -30,6 +32,38 @@
 #include <sensor_msgs/distortion_models.h>
 
 #include <string.h>
+
+void resfpscallback(feynman_camera::resfpsConfig &config)
+{
+  ROS_INFO("Reconfigure Request: %s %d",
+           config.resolution.c_str(),
+           config.fps);
+
+  if ((config.resolution != "1280x800" &&
+       config.resolution != "1280x720" &&
+       config.resolution != "640x480" &&
+       config.resolution != "640x400" &&
+       config.resolution != "320x200") ||
+      config.fps != 30)
+  {
+    ROS_INFO("Only support 1280x800/1280x720/640x480/640x400/320x200 at 30fps!");
+  }
+  else
+  {
+    if (config.resolution == "1280x800")
+      feynman_setresolutionfps(FEYNMAN_RESOLUTION_1280_800, config.fps);
+    else if (config.resolution == "1280x720")
+      feynman_setresolutionfps(FEYNMAN_RESOLUTION_1280_720, config.fps);
+    else if (config.resolution == "640x480")
+      feynman_setresolutionfps(FEYNMAN_RESOLUTION_640_480, config.fps);
+    else if (config.resolution == "640x400")
+      feynman_setresolutionfps(FEYNMAN_RESOLUTION_640_400, config.fps);
+    else if (config.resolution == "320x200")
+      feynman_setresolutionfps(FEYNMAN_RESOLUTION_320_200, config.fps);
+
+    feynman_resetpipeline();
+  }
+}
 ////////////////////////////////////
 using namespace cv;
 unsigned char *g_leftdepth = NULL;
@@ -283,6 +317,8 @@ typedef struct
 {
   char devicename[64];
   unsigned int device_id;
+  unsigned int fps;
+  char resolution[16];
   int connected;
   ros::Publisher depthrawpublisher;
   ros::Publisher depthrawleftpublisher;
@@ -1115,6 +1151,26 @@ void othercallback(void *data, void *userdata)
     //printf("camera fps:%d\n", tmpinfo->fps.fps);
     info->temperaturepublisher.publish(tempinfo);
     // ROS_INFO("recv deviceid:0x%X\n", tmpinfo->device_id);
+    if ((0 == strcmp(info->resolution, "1280x800") && tmpinfo->fps.resolution != 0) ||
+        (0 == strcmp(info->resolution, "1280x720") && tmpinfo->fps.resolution != 1) ||
+        (0 == strcmp(info->resolution, "640x480") && tmpinfo->fps.resolution != 2) ||
+        (0 == strcmp(info->resolution, "640x400") && tmpinfo->fps.resolution != 3) ||
+        (0 == strcmp(info->resolution, "320x200") && tmpinfo->fps.resolution != 4) ||
+        info->fps != tmpinfo->fps.fps)
+    {
+      if (0 == strcmp(info->resolution, "1280x800"))
+        feynman_setresolutionfps(FEYNMAN_RESOLUTION_1280_800, info->fps);
+      else if (0 == strcmp(info->resolution, "1280x720"))
+        feynman_setresolutionfps(FEYNMAN_RESOLUTION_1280_720, info->fps);
+      else if (0 == strcmp(info->resolution, "640x480"))
+        feynman_setresolutionfps(FEYNMAN_RESOLUTION_640_480, info->fps);
+      else if (0 == strcmp(info->resolution, "640x400"))
+        feynman_setresolutionfps(FEYNMAN_RESOLUTION_640_400, info->fps);
+      else if (0 == strcmp(info->resolution, "320x200"))
+        feynman_setresolutionfps(FEYNMAN_RESOLUTION_320_200, info->fps);
+
+      feynman_resetpipeline();
+    }
   }
   else if (tmppack->type == FEYNMAN_COMMAND_DATA && tmppack->sub_type == FEYNMAN_COMMAND_GET_CAM_PARAM_RETURN)
   {
@@ -1202,11 +1258,47 @@ int main(int argc, char *argv[])
   ros::init(argc, argv, "feynman_camera");
   ros::NodeHandle node_obj;
 
+  dynamic_reconfigure::Server<feynman_camera::resfpsConfig> dynamicresfpsserver;
+  dynamic_reconfigure::Server<feynman_camera::resfpsConfig>::CallbackType f;
+  f = boost::bind(&resfpscallback, _1); //绑定回调函数
+  dynamicresfpsserver.setCallback(f);   //为服务器设置回调函数， 节点程序运行时会调用一次回调函数来输出当前的参数配置情况
+
   ROS_INFO("will get device_id from launch!\n");
   int device_id = 305419896;
-  ros::param::get("/feynmannode/device_id", device_id);
+  int fps = 30;
+  std::string resolutionstr = "";
+  if (!ros::param::get("/feynmannode/device_id", device_id))
+  {
+    printf("fail to get device id from param!\n");
+    exit(0);
+  }
   //  usleep(10*1000*1000);
   ROS_INFO("got device_id:%d from launch!\n", device_id);
+
+  if (!ros::param::get("/feynmannode/resolution", resolutionstr))
+  {
+    printf("fail to get resolution from param!\n");
+    exit(0);
+  }
+  ROS_INFO("got resolution:%s from launch!\n", resolutionstr.c_str());
+
+  if (!ros::param::get("/feynmannode/fps", fps))
+  {
+    printf("fail to get fps from param!");
+    exit(0);
+  }
+  ROS_INFO("got fps:%d from launch!\n", fps);
+  if ((resolutionstr != "1280x800" &&
+       resolutionstr != "1280x720" &&
+       resolutionstr != "640x480" &&
+       resolutionstr != "640x400" &&
+       resolutionstr != "320x200") ||
+      fps != 30)
+  {
+    printf("Only support 1280x800/1280x700/640x480/640x400/320x200 at 30fps!\n");
+    exit(0);
+  }
+
   char tmpparamsstr[64];
   sprintf(tmpparamsstr, "feynman_camera/%d/streammode", device_id);
 
@@ -1285,6 +1377,8 @@ int main(int argc, char *argv[])
   feynman_init();
 
   info->device_id = device_id;
+  info->fps = fps;
+  strcpy(info->resolution, resolutionstr.c_str());
   while (info->connected == 0)
   {
     ROS_INFO("will refresh usb device!\n");
