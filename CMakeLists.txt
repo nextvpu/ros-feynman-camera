@@ -49,7 +49,6 @@ add_service_files(
   SetStreamMode.srv
   SetDepthMode.srv
   SetProjector.srv
-  GetCameraParam.srv
   SwitchRectify.srv
   SaveDepth.srv
   RemoveDark.srv
