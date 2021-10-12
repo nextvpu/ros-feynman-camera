@@ -51,6 +51,7 @@ void resfpscallback(feynman_camera::resfpsConfig &config)
   }
   else
   {
+    ROS_INFO("will change resolution!!!!\n");
     if (config.resolution == "1280x800")
       feynman_setresolutionfps(FEYNMAN_RESOLUTION_1280_800, config.fps);
     else if (config.resolution == "1280x720")
@@ -361,36 +362,38 @@ void savecallback(void *data, void *userdata)
       int width = g_cameraparam[0].img_width;
       int height = g_cameraparam[0].img_height;
 
-      if (g_leftdepth != NULL && g_removedark)
+      if (g_leftdepth != NULL && g_removedark && (tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER)) == width * height * 2)
       {
-        Mat tempdepth = Mat(height, width, CV_16U, Scalar::all(0));
+        Mat *tempdepth = new Mat(height, width, CV_16U, Scalar::all(0));
         // 循环赋值
         for (int i = 0; i < height; i++)
         {
           for (int j = 0; j < width; j++)
           {
-            tempdepth.at<uint16_t>(i, j) = *((uint16_t *)(tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER)) + i * width + j);
+            tempdepth->at<uint16_t>(i, j) = *((uint16_t *)(tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER)) + i * width + j);
           }
         }
-        Mat templeftraw = Mat(height, width, CV_8U, Scalar::all(0));
+        Mat *templeftraw = new Mat(height, width, CV_8U, Scalar::all(0));
         // 循环赋值
         for (int i = 0; i < height; i++)
         {
           for (int j = 0; j < width; j++)
           {
-            templeftraw.at<uint8_t>(i, j) = *((uint8_t *)(g_leftdepth) + i * width + j);
+            templeftraw->at<uint8_t>(i, j) = *((uint8_t *)(g_leftdepth) + i * width + j);
           }
         }
         int8_t winsize = 15;
-        removeDarkOutliers(templeftraw, tempdepth, pixthreshold, sigmathreshold, winsize);
+        removeDarkOutliers(*templeftraw, *tempdepth, pixthreshold, sigmathreshold, winsize);
 
         for (int i = 0; i < height; i++)
         {
           for (int j = 0; j < width; j++)
           {
-            *((uint16_t *)(tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER)) + i * width + j) = tempdepth.at<uint16_t>(i, j);
+            *((uint16_t *)(tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER)) + i * width + j) = tempdepth->at<uint16_t>(i, j);
           }
         }
+        delete templeftraw;
+        delete tempdepth;
       }
     }
   }
@@ -556,7 +559,7 @@ void rgbcallback(void *data, void *userdata)
   FEYNMAN_USBHeaderDataPacket *tmppack = (FEYNMAN_USBHeaderDataPacket *)data;
   if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_RGB_IMAGE_SINGLE)
   {
-    if (g_cameraparam.size() == 1)
+    if (g_cameraparam.size() == 1 && (tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER)) == g_cameraparam[0].img_width * g_cameraparam[0].img_height * 3 / 2)
     {
       s_feynman_cam_param theparam = g_cameraparam[0];
       sensor_msgs::Image new_image;
@@ -682,7 +685,7 @@ void depthcallback(void *data, void *userdata)
       int width = g_cameraparam[0].img_width;
       int height = g_cameraparam[0].img_height;
 
-      if (g_leftdepth != NULL && g_removedark)
+      if (g_leftdepth != NULL && g_removedark && (tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER)) == width * height * 2)
       {
         Mat tempdepth = Mat(height, width, CV_16U, Scalar::all(0));
         // 循环赋值
@@ -720,7 +723,7 @@ void depthcallback(void *data, void *userdata)
   {
     // ROS_INFO("depth data!\n");
 
-    if (g_cameraparam.size() == 1)
+    if (g_cameraparam.size() == 1 && (tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER)) == g_cameraparam[0].img_width * g_cameraparam[0].img_height * 2)
     {
 
       int width = g_cameraparam[0].img_width;
@@ -982,7 +985,7 @@ void ircallback(void *data, void *userdata)
   if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_IR_IMAGE_LEFT_VI)
   {
     //ROS_INFO("depth left raw!\n");
-    if (g_cameraparam.size() == 1)
+    if (g_cameraparam.size() == 1 && (tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER)) == g_cameraparam[0].img_width * g_cameraparam[0].img_height * 3 / 2)
     {
       s_feynman_cam_param theparam = g_cameraparam[0];
       sensor_msgs::Image new_image;
@@ -1014,7 +1017,7 @@ void ircallback(void *data, void *userdata)
   else if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_IR_IMAGE_RIGHT_VI)
   {
     //ROS_INFO("depth left raw!\n");
-    if (g_cameraparam.size() == 1)
+    if (g_cameraparam.size() == 1 && (tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER)) == g_cameraparam[0].img_width * g_cameraparam[0].img_height * 3 / 2)
     {
       s_feynman_cam_param theparam = g_cameraparam[0];
       sensor_msgs::Image new_image;
@@ -1046,7 +1049,7 @@ void ircallback(void *data, void *userdata)
   else if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_IR_IMAGE_LEFT_VPSS)
   {
     //ROS_INFO("depth left raw!\n");
-    if (g_cameraparam.size() == 1)
+    if (g_cameraparam.size() == 1 && (tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER)) == g_cameraparam[0].img_width * g_cameraparam[0].img_height * 3 / 2)
     {
       s_feynman_cam_param theparam = g_cameraparam[0];
       sensor_msgs::Image new_image;
@@ -1078,7 +1081,7 @@ void ircallback(void *data, void *userdata)
   else if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_IR_IMAGE_RIGHT_VPSS)
   {
     //ROS_INFO("depth left raw!\n");
-    if (g_cameraparam.size() == 1)
+    if (g_cameraparam.size() == 1 && (tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER)) == g_cameraparam[0].img_width * g_cameraparam[0].img_height * 3 / 2)
     {
       s_feynman_cam_param theparam = g_cameraparam[0];
       sensor_msgs::Image new_image;
@@ -1110,7 +1113,7 @@ void ircallback(void *data, void *userdata)
   else if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_DEPTH_IMAGE_LEFT_RAW)
   {
     //ROS_INFO("depth left raw!\n");
-    if (g_cameraparam.size() == 1)
+    if (g_cameraparam.size() == 1 && (tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER)) == g_cameraparam[0].img_width * g_cameraparam[0].img_height)
     {
       unsigned char *tmpimgdata = tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER);
       int width = g_cameraparam[0].img_width;
@@ -1201,7 +1204,7 @@ void ircallback(void *data, void *userdata)
   else if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_DEPTH_IMAGE_RIGHT_RAW)
   {
     // ROS_INFO("depth right raw!\n");
-    if (g_cameraparam.size() == 1)
+    if (g_cameraparam.size() == 1 && (tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER)) == g_cameraparam[0].img_width * g_cameraparam[0].img_height)
     {
       s_feynman_cam_param theparam = g_cameraparam[0];
       sensor_msgs::Image new_image;
@@ -1298,15 +1301,44 @@ void othercallback(void *data, void *userdata)
     tempinfo.cputemp = tmpinfo->cpu_temperaure;
     tempinfo.projectortemp = tmpinfo->projector_temperaure[0];
     //printf("camera fps:%d\n", tmpinfo->fps.fps);
+
     info->temperaturepublisher.publish(tempinfo);
-    // ROS_INFO("recv deviceid:0x%X\n", tmpinfo->device_id);
-    if ((0 == strcmp(info->resolution, "1280x800") && tmpinfo->fps.resolution != 0) ||
-        (0 == strcmp(info->resolution, "1280x720") && tmpinfo->fps.resolution != 1) ||
-        (0 == strcmp(info->resolution, "640x480") && tmpinfo->fps.resolution != 2) ||
-        (0 == strcmp(info->resolution, "640x400") && tmpinfo->fps.resolution != 3) ||
-        (0 == strcmp(info->resolution, "320x200") && tmpinfo->fps.resolution != 4) ||
-        info->fps != tmpinfo->fps.fps)
+    static bool g_isfirsttime = true;
+    if (tmpinfo->fps.resolution == 0)
     {
+      ROS_INFO("recv resolution:1280x800\n");
+    }
+    else if (tmpinfo->fps.resolution == 1)
+    {
+      ROS_INFO("recv resolution:1280x720\n");
+    }
+    else if (tmpinfo->fps.resolution == 2)
+    {
+      ROS_INFO("recv resolution:640x480\n");
+    }
+    else if (tmpinfo->fps.resolution == 3)
+    {
+      ROS_INFO("recv resolution:640x400\n");
+    }
+    else if (tmpinfo->fps.resolution == 4)
+    {
+      ROS_INFO("recv resolution:320x200\n");
+    }
+    else
+    {
+      ROS_INFO("recv resolution:unknown:%d\n", tmpinfo->fps.resolution);
+    }
+
+    if (((0 == strcmp(info->resolution, "1280x800") && tmpinfo->fps.resolution != 0) ||
+         (0 == strcmp(info->resolution, "1280x720") && tmpinfo->fps.resolution != 1) ||
+         (0 == strcmp(info->resolution, "640x480") && tmpinfo->fps.resolution != 2) ||
+         (0 == strcmp(info->resolution, "640x400") && tmpinfo->fps.resolution != 3) ||
+         (0 == strcmp(info->resolution, "320x200") && tmpinfo->fps.resolution != 4) ||
+         info->fps != tmpinfo->fps.fps) &&
+        g_isfirsttime)
+    {
+      g_isfirsttime = false;
+      printf("will change resolution only once!!!\n");
       if (0 == strcmp(info->resolution, "1280x800"))
         feynman_setresolutionfps(FEYNMAN_RESOLUTION_1280_800, info->fps);
       else if (0 == strcmp(info->resolution, "1280x720"))
