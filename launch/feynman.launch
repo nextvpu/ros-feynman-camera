@@ -5,7 +5,7 @@
         output="screen"
         required="true">
     <param name="device_id" value="305419896" />
-    <param name="resolution" value="1280x720" />
+    <param name="resolution" value="640x400" />
     <param name="fps" value="30" />
   </node>
 </launch>

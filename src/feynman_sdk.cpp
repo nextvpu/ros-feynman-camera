@@ -308,8 +308,8 @@ const unsigned char colortable[256][3] = {{16, 128, 128},
 #define log_printf printf
 
 extern int update_result;
-extern int8_t upgrade_update_flag[256];
-void usb_upgrade_callback(FEYNMAN_UPGRADE_SUB_TYPE type, void *data, uint32_t size)
+extern uint8_t upgrade_update_flag[256];
+/*void usb_upgrade_callback(FEYNMAN_UPGRADE_SUB_TYPE type, void *data, uint32_t size)
 {
 	extern int32_t get_upgrade_update_flag_index(FEYNMAN_UPGRADE_SUB_TYPE type);
 	int32_t index = get_upgrade_update_flag_index(type);
@@ -352,7 +352,7 @@ void usb_upgrade_callback(FEYNMAN_UPGRADE_SUB_TYPE type, void *data, uint32_t si
 		}
 		}
 	}
-}
+}*/
 
 int feynman_getyuvfromindex(int index, unsigned char *py, unsigned char *pu, unsigned char *pv)
 {
@@ -546,9 +546,13 @@ void feynman_resetpipeline()
 }
 void feynman_transferrgb(int enable)
 {
-	//	s_feynman_img_transfer cmd;
-	//	cmd.status = enable;
-	//	send_one_packet(FEYNMAN_COMMAND_DATA, FEYNMAN_COMMAND_USB_IMG_DEPTH_IR_TRANSFER_COMMAND, sizeof(s_feynman_img_transfer), (const uint8_t*)&cmd);
+	if (feynman_hasconnect())
+	{
+		s_feynman_img_depth_rgb_transfer tmptransfer;
+		tmptransfer.status = enable;
+
+		send_one_packet(FEYNMAN_COMMAND_DATA, FEYNMAN_COMMAND_USB_IMG_DEPTH_RGB_TRANSFER_COMMAND, sizeof(s_feynman_img_depth_rgb_transfer), (const uint8_t *)&tmptransfer, 2000);
+	}
 }
 void feynman_transferir(int enable)
 {
@@ -589,7 +593,7 @@ void feynman_transferdepth(int mode)
 	}
 }
 void feynman_setmode(int mode)
-{ //0.vi 1.vpss 2.depth 3.cnn
+{ //0.vi 1.vpss 2.depth 3.cnn 4.upgrade
 	if (feynman_hasconnect())
 	{
 		s_feynman_run_config cmd;
@@ -1203,7 +1207,16 @@ irprocessthread(void *param)
 #endif
 	return 0;
 }
+void feynman_setpointcloudtransfer(int willtransfer)
+{
+	if (feynman_hasconnect())
+	{
+		s_feynman_img_pointcloud_transfer tmptransfer;
+		tmptransfer.status = willtransfer;
 
+		send_one_packet(FEYNMAN_COMMAND_DATA, FEYNMAN_COMMAND_USB_IMG_POINTCLOUD_TRANSFER_COMMAND, sizeof(s_feynman_img_pointcloud_transfer), (const uint8_t *)&tmptransfer, 2000);
+	}
+}
 #ifdef _WINDOWS
 static unsigned __stdcall depthprocessthread(void *param)
 {
@@ -1365,8 +1378,20 @@ static void *usb_loop_recv(void *pParam)
 		int bytesTransffered = 0;
 		int32_t ret = usb_hal_read(tmpbuf, USB_PACKET_MAX_SIZE /*sizeof(toolobj->g_usb_buf)*/, &bytesTransffered);
 
-		if (ret <= 0)
+		if (ret == 0)
 		{
+			printf("received nothing!!!!\n");
+			continue;
+		}
+		else if (ret == LIBUSB_ERROR_TIMEOUT)
+		{
+			printf("just timeout!!!\n");
+			continue;
+		}
+		else if (ret < 0)
+		{
+			printf("ret:%d and not equal LIBUSB_ERROR_TIMEOUT,something bad happened!\n", ret);
+			g_thread_running_flag = 0;
 			continue;
 		}
 
@@ -1448,6 +1473,20 @@ static HANDLE sendthread;
 #else
 static pthread_t recvthread, depththread, rgbthread, imuthread, irthread, savethread, sendthread;
 #endif
+void feynman_waitfordisconnect()
+{
+	pthread_join(recvthread, NULL);
+	pthread_join(irthread, NULL);
+	pthread_join(rgbthread, NULL);
+	pthread_join(imuthread, NULL);
+	pthread_join(depththread, NULL);
+	pthread_join(savethread, NULL);
+	pthread_join(sendthread, NULL);
+
+	s_hasconnect = FALSE;
+	g_thread_running_flag = 0;
+}
+
 void feynman_disconnectcamera()
 {
 	if (feynman_hasconnect())

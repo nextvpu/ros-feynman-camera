@@ -9,6 +9,7 @@
 #include "feynman_camera/SetExposure.h"
 #include "feynman_camera/SetDepthMode.h"
 #include "feynman_camera/SetProjector.h"
+#include "feynman_camera/EnablePointCloud.h"
 #include "feynman_camera/GetCameraParam.h"
 #include "feynman_camera/temp_info.h"
 #include "feynman_camera/imu_frame.h"
@@ -252,6 +253,14 @@ bool handle_device_depthmode_request(feynman_camera::SetDepthModeRequest &req,
     feynman_setdepthstitch(1);
     feynman_resetpipeline();
   }
+  return true;
+}
+bool handle_device_enablepointcloud_request(feynman_camera::EnablePointCloudRequest &req,
+                                            feynman_camera::EnablePointCloudResponse &res)
+{
+
+  feynman_setpointcloudtransfer(req.enable);
+
   return true;
 }
 bool handle_device_setprojector_request(feynman_camera::SetProjectorRequest &req,
@@ -1293,7 +1302,11 @@ void othercallback(void *data, void *userdata)
   DEVICEINFO *info = (DEVICEINFO *)userdata;
   FEYNMAN_USBHeaderDataPacket *tmppack = (FEYNMAN_USBHeaderDataPacket *)data;
 
-  if (tmppack->type == FEYNMAN_DEVICE_DATA && tmppack->sub_type == FEYNMAN_DEVICE_DATA_ALL)
+  if (tmppack->type == FEYNMAN_USER_DATA && tmppack->sub_type == FEYNMAN_USER_DATA_TO_PC)
+  {
+    ROS_INFO("receive user deined data!");
+  }
+  else if (tmppack->type == FEYNMAN_DEVICE_DATA && tmppack->sub_type == FEYNMAN_DEVICE_DATA_ALL)
   {
     s_feynman_device_info *tmpinfo = (s_feynman_device_info *)tmppack->data;
     g_runconfig = tmpinfo->app_run_mode.app_run_mode;
@@ -1432,7 +1445,33 @@ void callback(const char *devicename, void *userdata)
     }
   }
 }
+void *devicethread(void *param)
+{
+  DEVICEINFO *info = (DEVICEINFO *)param;
+  feynman_init();
+  while (1)
+  {
+    while (info->connected == 0)
+    {
+      ROS_INFO("will refresh usb device!\n");
+      usleep(1000 * 1000);
+      feynman_refresh(callback, info);
+    }
+    ROS_INFO("device:%d connected!\n", info->device_id);
 
+    feynman_connectcamera(info->devicename,
+                          imucallback,
+                          savecallback,
+                          depthcallback,
+                          ircallback,
+                          rgbcallback,
+                          othercallback, info);
+    ROS_INFO("after connect camera!\n");
+    feynman_waitfordisconnect();
+    info->connected = 0;
+  }
+  return 0;
+}
 int main(int argc, char *argv[])
 {
   ROS_INFO("enter main func!\n");
@@ -1505,6 +1544,9 @@ int main(int argc, char *argv[])
   sprintf(tmpparamsstr, "feynman_camera/%d/setprojector", device_id);
   ros::ServiceServer devicesetprojectorservice = node_obj.advertiseService(tmpparamsstr, handle_device_setprojector_request);
 
+  sprintf(tmpparamsstr, "feynman_camera/%d/enablepointcloud", device_id);
+  ros::ServiceServer enablepointcloudservice = node_obj.advertiseService(tmpparamsstr, handle_device_enablepointcloud_request);
+
   sprintf(tmpparamsstr, "feynman_camera/%d/exposure", device_id);
   ros::ServiceServer devicesetexposureservice = node_obj.advertiseService(tmpparamsstr, handle_device_exposure_request);
 
@@ -1567,27 +1609,12 @@ int main(int argc, char *argv[])
   sprintf(tmpparamsstr, "/feynman_camera/%d/cameralog", device_id);
   info->logpublisher = node_obj.advertise<std_msgs::String>(tmpparamsstr, 10);
 
-  feynman_init();
-
   info->device_id = device_id;
   info->fps = fps;
   strcpy(info->resolution, resolutionstr.c_str());
-  while (info->connected == 0)
-  {
-    ROS_INFO("will refresh usb device!\n");
-    usleep(1000 * 1000);
-    feynman_refresh(callback, info);
-  }
-  ROS_INFO("device:%d connected!\n", info->device_id);
 
-  feynman_connectcamera(info->devicename,
-                        imucallback,
-                        savecallback,
-                        depthcallback,
-                        ircallback,
-                        rgbcallback,
-                        othercallback, info);
-  ROS_INFO("after connect camera!\n");
+  pthread_t devicethreadid;
+  pthread_create(&devicethreadid, NULL, devicethread, info);
   // getchar();
   ros::spin();
   feynman_deinit();

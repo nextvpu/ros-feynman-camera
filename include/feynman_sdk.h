@@ -178,18 +178,25 @@ extern "C"
 		FEYNMAN_COMMAND_USB_IMG_DEPTH_IR_TRANSFER_COMMAND = 0xAC,	 /**< image depth ir transfer 172  */
 		FEYNMAN_COMMAND_USB_IMG_DEPTH_IR_TRANSFER_RETURN,			 /**< return image depth ir transfer 173  */
 		FEYNMAN_COMMAND_USB_IMG_DEPTH_DEPTH_TRANSFER_COMMAND = 0xAE, /**< image depth depth transfer 174  */
-		FEYNMAN_COMMAND_USB_IMG_DEPTH_DEPTH_TRANSFER_RETURN			 /**< return image depth depth transfer 175  */
+		FEYNMAN_COMMAND_USB_IMG_DEPTH_DEPTH_TRANSFER_RETURN,		 /**< return image depth depth transfer 175  */
+
+		FEYNMAN_COMMAND_USB_IMG_DEPTH_RGB_TRANSFER_COMMAND = 0xB0,	/**< image depth rgb transfer 176  */
+		FEYNMAN_COMMAND_USB_IMG_DEPTH_RGB_TRANSFER_RETURN,			/**< return image depth rgb transfer 177  */
+		FEYNMAN_COMMAND_USB_IMG_POINTCLOUD_TRANSFER_COMMAND = 0xB2, /**< image pointcloud transfer 178  */
+		FEYNMAN_COMMAND_USB_IMG_POINTCLOUD_TRANSFER_RETURN			/**< return image pointcloud transfer 179  */
 	} FEYNMAN_COMMAND_SUB_TYPE;
 
 	/** FEYNMAN_UPGRADE_SUB_TYPE */
 	typedef enum
 	{
-		FEYNMAN_COMMAND_USB_UPGRADE_FEYNMAN = 0x00, /**< upgrade feynman file 0  */
-		FEYNMAN_COMMAND_USB_UPGRADE_FEYNMAN_RETURN, /**< upgrade feynman file return data type 1  */
-		FEYNMAN_COMMAND_USB_UPGRADE_LIB,			/**< upgrade library file 2  */
-		FEYNMAN_COMMAND_USB_UPGRADE_LIB_RETURN,		/**< upgrade library file return data type 3  */
-		FEYNMAN_COMMAND_USB_UPGRADE_FILE,			/**< upgrade other type of file 4  */
-		FEYNMAN_COMMAND_USB_UPGRADE_FILE_RETURN		/**< upgrade file return data type 5  */
+		FEYNMAN_COMMAND_USB_UPGRADE_USER_FILE = 0x00,	   /**< upgrade feynman file 0  */
+		FEYNMAN_COMMAND_USB_UPGRADE_USER_FILE_RETURN,	   /**< upgrade feynman file return data type 1  */
+		FEYNMAN_COMMAND_USB_UPGRADE_USER_CONFIG,		   /**< upgrade library file 2  */
+		FEYNMAN_COMMAND_USB_UPGRADE_USER_CONFIG_RETURN,	   /**< upgrade library file return data type 3  */
+		FEYNMAN_COMMAND_USB_UPGRADE_NEXTVPU_SYSTEM,		   /**< upgrade other type of file 4  */
+		FEYNMAN_COMMAND_USB_UPGRADE_NEXTVPU_SYSTEM_RETURN, /**< upgrade file return data type 5  */
+		FEYNMAN_COMMAND_USB_UPGRADE_NEXTVPU_CONFIG,
+		FEYNMAN_COMMAND_USB_UPGRADE_NEXTVPU_CONFIG_RETURN
 	} FEYNMAN_UPGRADE_SUB_TYPE;
 
 	/** FEYNMAN_SENSOR_RESOLUTION_TYPE */
@@ -214,18 +221,6 @@ extern "C"
 		FEYNMAN_LOG_ALL = 0x00, /**< log data type 0  */
 	} FEYNMAN_LOG_DATA_SUB_TYPE;
 
-	//for FEYNMAN_COMMAND_GET_RUN_CONFIGURATION_COMMAND & FEYNMAN_COMMAND_SET_RUN_CONFIGURATION_COMMAND
-	typedef struct
-	{
-		int app_run_mode; //0-vi 1-vpss 2-depth 3-CNN demo
-	} s_feynman_run_config;
-
-	//for FEYNMAN_COMMAND_SAVE_CONFIGURATION_COMMAND
-	typedef struct
-	{
-		int status; //0-save success, else save faile
-	} s_feynman_save_config;
-
 	/** FEYNMAN_CNN_DATASUB_TYPE */
 	typedef enum
 	{
@@ -238,6 +233,18 @@ extern "C"
 		FEYNMAN_USER_DATA_TO_PC = 0X00, /**< user defined data from camera to pc 0  */
 		FEYNMAN_USER_DATA_TO_BOARD		/**< user defined data from pc to camera 1  */
 	} FEYNMAN_USER_DATA_SUB_TYPE;
+
+	//for FEYNMAN_COMMAND_GET_RUN_CONFIGURATION_COMMAND & FEYNMAN_COMMAND_SET_RUN_CONFIGURATION_COMMAND
+	typedef struct
+	{
+		int app_run_mode; //0-vi 1-vpss 2-depth 3-CNN demo 4-upgrade
+	} s_feynman_run_config;
+
+	//for FEYNMAN_COMMAND_SAVE_CONFIGURATION_COMMAND
+	typedef struct
+	{
+		int status; //0-save success, else save faile
+	} s_feynman_save_config;
 
 	/**@struct FEYNMAN_USBHeaderDataPacket
 	* @brief usb packet struct \n
@@ -528,8 +535,13 @@ extern "C"
 		int imu_transfer;						   /**< 0-stop transfer, 1-start transfer */
 		int image_freq;							   /**< ͼ����յ�֡�� */
 		s_feynman_run_config app_run_mode;
-		int hardware_version[2]; //[0]-major version [1]-minor version
+		char reserved0[8]; //[0]-major version [1]-minor version
 		char software_version[64];
+		char usb_proto_version[16];
+		char product_type[16];
+		int sensor_number;
+		int has_network;
+		char ip_addr[16]; //192.168.xxx.xxx
 	} s_feynman_device_info;
 
 	/**@struct s_feynman_ir_sensor_exposure_infor
@@ -616,6 +628,15 @@ extern "C"
 		uint64_t timestamp;	   /**< timestamp of data */
 		uint32_t reserved[16]; /**< reserved for later data definition */
 	} FEYNMAN_USB_IMAGE_HEADER;
+
+	typedef struct
+	{
+		int status; //0-stop transfer, 1-start transfer
+	} s_feynman_img_depth_rgb_transfer;
+	typedef struct
+	{
+		int status; //0-stop transfer, 1-start transfer
+	} s_feynman_img_pointcloud_transfer;
 
 	typedef void (*FRAMECALLBACK)(void *data, void *userdata);
 	typedef void (*DEVICECALLBACK)(const char *devicename, void *userdata);
@@ -1205,6 +1226,8 @@ extern "C"
 	*/
 	void feynman_setresolutionfps(FEYNMAN_SENSOR_RESOLUTION_TYPE res, unsigned int fps);
 
+	void feynman_setpointcloudtransfer(int willtransfer);
+	void feynman_waitfordisconnect();
 #ifdef __cplusplus
 }
 #endif

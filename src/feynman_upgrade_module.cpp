@@ -10,6 +10,8 @@
 #include <windows.h>
 #include <conio.h>
 #include <tchar.h>
+#else
+#include <unistd.h>
 #endif
 
 #include <string.h>
@@ -18,18 +20,19 @@
 #include <iostream>
 #include <time.h>
 
-#define UPGRADE_MAX_BLK_SIZE (1024 * 2)
+#define UPGRADE_MAX_BLK_SIZE (1024 * 46)
 #pragma warning(disable : 4996)
 #define log_printf printf
 int update_result = 0;
-int8_t upgrade_update_flag[256] = {0};
+uint8_t upgrade_update_flag[256] = {0};
 /*
-return : -1:�ļ���ʧ�ܻ��ļ�������
-         -2:ϵͳ�ڴ����
-         -3:��������ֹͣ����
-         0:�ɹ�
+return : -1:文件打开失败或文件不存在
+         -2:系统内存错误
+         -3:发生错误，停止传输
+         0:成功
 */
 
+int32_t usb_send_upgrade_and_get_ack(FEYNMAN_UPGRADE_SUB_TYPE type, void *data, int32_t size, int32_t timeout);
 int feynman_upgrade(int upgrade_type, char *dst_path, char *dst_filename, char *local_filename)
 {
     int ret_code = -1;
@@ -71,32 +74,43 @@ int feynman_upgrade(int upgrade_type, char *dst_path, char *dst_filename, char *
                 strcpy(header->path, dst_path);
                 strcpy(header->name, dst_filename);
                 header->data_len = read_len;
-                log_printf("upgrade : total_blk[%d], current_blk[%d], offset[%d], data_len[%d]\r",
+                log_printf("upgrade : total_blk[%d], current_blk[%d], offset[%d], data_len[%d]\n",
                            header->packet_numbers, header->curr_packet_numbers, read_offset, header->data_len);
                 read_offset += read_len;
 
-                int32_t usb_send_upgrade_and_get_ack(FEYNMAN_UPGRADE_SUB_TYPE type, void *data, int32_t size, int32_t timeout);
-                if ((updated = usb_send_upgrade_and_get_ack(
-                         (upgrade_type == 0) ? FEYNMAN_COMMAND_USB_UPGRADE_FEYNMAN : ((upgrade_type == 1) ? FEYNMAN_COMMAND_USB_UPGRADE_LIB : FEYNMAN_COMMAND_USB_UPGRADE_FILE),
-                         header, sizeof(s_feynman_upgrade_data) + read_len, 0)) != 1)
+                if ((updated = usb_send_upgrade_and_get_ack((FEYNMAN_UPGRADE_SUB_TYPE)upgrade_type,
+                                                            //   (upgrade_type==0) ? FEYNMAN_COMMAND_USB_UPGRADE_FEYNMAN : ((upgrade_type == 1) ? FEYNMAN_COMMAND_USB_UPGRADE_LIB : FEYNMAN_COMMAND_USB_UPGRADE_FILE),
+                                                            header, sizeof(s_feynman_upgrade_data) + read_len, 0)) == 1)
                 {
-                    if (update_result == -1)
+                    /*if (update_result == -1)
                     {
-                        //need retransfer
+                        //need retransfer                        
                         fseek(fp, 0 - read_len, SEEK_CUR);
                         read_offset -= read_len;
                         current_blk--;
+                    }                    
+                    else  */
+                    if (update_result == 0)
+                    {
+                        //this package success, do nothing
                     }
-                    else if (update_result == -2)
+                    else if (update_result == 1)
+                    {
+                        //this file success, break
+                        break;
+                    }
+                    else
                     {
                         //occr error ,stop
                         ret_code = -3;
                         break;
                     }
-                    else
-                    {
-                        //success, do nothing
-                    }
+                }
+                else
+                {
+                    //occur fatal error, stop
+                    ret_code = -4;
+                    break;
                 }
             }
         }
@@ -116,22 +130,16 @@ int32_t get_upgrade_update_flag_index(FEYNMAN_UPGRADE_SUB_TYPE type)
 
     switch (type)
     {
-    case FEYNMAN_COMMAND_USB_UPGRADE_FEYNMAN:
-    case FEYNMAN_COMMAND_USB_UPGRADE_FEYNMAN_RETURN:
+    case FEYNMAN_COMMAND_USB_UPGRADE_USER_FILE:
+    case FEYNMAN_COMMAND_USB_UPGRADE_USER_FILE_RETURN:
     {
         index = 0;
         break;
     }
-    case FEYNMAN_COMMAND_USB_UPGRADE_LIB:
-    case FEYNMAN_COMMAND_USB_UPGRADE_LIB_RETURN:
+    case FEYNMAN_COMMAND_USB_UPGRADE_NEXTVPU_SYSTEM:
+    case FEYNMAN_COMMAND_USB_UPGRADE_NEXTVPU_SYSTEM_RETURN:
     {
         index = 1;
-        break;
-    }
-    case FEYNMAN_COMMAND_USB_UPGRADE_FILE:
-    case FEYNMAN_COMMAND_USB_UPGRADE_FILE_RETURN:
-    {
-        index = 2;
         break;
     }
     }
@@ -174,9 +182,13 @@ static void feynman_usb_send_upgrade(uint16_t type, void *p_data, int data_lengt
     {
         memcpy(p_cmd->data, p_data, data_length);
     }
-    extern int usb_hal_write(uint8_t * data, int len, int *bytesTransffered, int timeout);
+    extern int usb_hal_write(uint8_t * data, int len, int *bytesTransffered, int32_t timeout);
     int transfered = 0;
-    usb_hal_write((uint8_t *)p_cmd, sizeof(FEYNMAN_USBHeaderDataPacket) + data_length, &transfered, 2000);
+    if ((FEYNMAN_UPGRADE_SUB_TYPE)type == FEYNMAN_COMMAND_USB_UPGRADE_NEXTVPU_SYSTEM)
+        usb_hal_write((uint8_t *)p_cmd, sizeof(FEYNMAN_USBHeaderDataPacket) + data_length, &transfered, 4000);
+    else
+        usb_hal_write((uint8_t *)p_cmd, sizeof(FEYNMAN_USBHeaderDataPacket) + data_length, &transfered, 2000);
+
     /*	if (usb_para.m_dev_handle != NULL)
 	{
 		usb_bulk_write(usb_para.m_dev_handle, usb_para.usb_ep_out, (char*)p_cmd, sizeof(FEYNMAN_USBHeaderDataPacket) + data_length, 0);
@@ -194,6 +206,40 @@ int32_t usb_send_upgrade_and_get_ack(FEYNMAN_UPGRADE_SUB_TYPE type, void *data, 
     feynman_usb_send_upgrade(type, data, size);
     while (0 == (updated = usb_upgrade_mask_is_updated(type)))
     {
+        usleep(1000);
     }
     return updated;
+}
+
+void usb_upgrade_callback(FEYNMAN_UPGRADE_SUB_TYPE type, void *data, uint32_t size)
+{
+    int32_t index = get_upgrade_update_flag_index(type);
+    if (index >= 0)
+    {
+        switch (type)
+        {
+        case FEYNMAN_COMMAND_USB_UPGRADE_NEXTVPU_SYSTEM_RETURN:
+        {
+            update_result = ((s_feynman_upgrade_result *)data)->result;
+
+            log_printf("recv upgrade system ack, %s\r\n",
+                       (update_result == 1) ? "this file upgrade success" : ((update_result == 0) ? "this package upgrade success" : ((update_result == -2) ? "can't upgrade this file, stop" : "upgrade failed")));
+
+            upgrade_update_flag[index] = 0;
+
+            break;
+        }
+        case FEYNMAN_COMMAND_USB_UPGRADE_USER_FILE_RETURN:
+        {
+            update_result = ((s_feynman_upgrade_result *)data)->result;
+
+            log_printf("recv upgrade feynman ack, %s\r\n",
+                       (update_result == 1) ? "this file upgrade success" : ((update_result == 0) ? "this package upgrade success" : ((update_result == -2) ? "can't upgrade this file, stop" : "upgrade failed")));
+
+            upgrade_update_flag[index] = 0;
+
+            break;
+        }
+        }
+    }
 }
