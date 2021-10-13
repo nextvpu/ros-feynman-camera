@@ -109,6 +109,15 @@ when isauto is equal to 0,you can set left and right sensor's exposure time in m
 * `/feynman_camera/*/setprojector`:set projector on(1) or off(0)
 * `/feynman_camera/*/switchrectify`:switch sensor data of rectify('rectify') or not('vi')
 
+### Change Resolution
+1.run rqt_reconfigure
+```
+rosrun rqt_reconfigure rqt_reconfigure
+```
+2.change resolution in rqt_reconfigure dialog
+support resolution:1280x800,1280x720,640x480,640x400,320x200
+after modify resolution in the dialog,press enter key
+
 ### Examples
 
 After launching an feynman camera, you can get camera param by the following command(* means device_id of camera)
