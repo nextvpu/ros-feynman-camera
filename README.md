@@ -76,16 +76,19 @@ edit launch/feynman.launch and change the device_id to proper value.
 
 ## Important Topics
 (* means device_id of camera)  
-* `/feynman_camera/*/depth`:depth raw data,sensor_msgs::Image(16bit integer)
-* `/feynman_camera/*/depth_raw_left`:depth left raw data,sensor_msgs::Image(rgb888)
-* `/feynman_camera/*/depth_raw_right`:depth right raw data,sensor_msgs::Image(rgb888)
+* `/feynman_camera/*/depth/image_raw`:depth raw data,sensor_msgs::Image(16bit integer)
+* `/feynman_camera/*/leftir/image_rect`:depth left data(rectified),sensor_msgs::Image(rgb888)
+* `/feynman_camera/*/rightir/image_rect`:depth right data(rectified),sensor_msgs::Image(rgb888)
 * `/feynman_camera/*/temperature`:cpu and projector temperature,feynman_camera::temp_info(2 float point)
-* `/feynman_camera/*/dotcloud`:dot cloud data,sensor_msgs::PointCloud2
-* `/feynman_camera/*/rgb`:rgb sensor data,sensor_msgs::Image(rgb888)
-* `/feynman_camera/*/sensor_raw_left`:left sensor raw data,sensor_msgs::Image(rgb888)
-* `/feynman_camera/*/sensor_raw_right`:right sensor raw data,sensor_msgs::Image(rgb888)
-* `/feynman_camera/*/sensor_rectify_left`:rectify left sensor data,sensor_msgs::Image(rgb888)
-* `/feynman_camera/*/sensor_rectify_right`:rectify right sensor data,sensor_msgs::Image(rgb888)
+* `/feynman_camera/*/depth/dotcloud`:dot cloud data,sensor_msgs::PointCloud2
+* `/feynman_camera/*/rgb/image_rect_color`:rgb sensor data,sensor_msgs::Image(rgb888)
+* `/feynman_camera/*/leftir/image_color`:left sensor raw data(not rectified),sensor_msgs::Image(rgb888)
+* `/feynman_camera/*/rightir/image_color`:right sensor raw data(not rectified),sensor_msgs::Image(rgb888)
+* `/feynman_camera/*/leftir/image_rect_color`:rectify left sensor data,sensor_msgs::Image(rgb888)
+* `/feynman_camera/*/rightir/image_rect_color`:rectify right sensor data,sensor_msgs::Image(rgb888)
+* `/feynman_camera/*/leftir/camera_info`:camerainfo of left ir camera
+* `/feynman_camera/*/rightir/camera_info`:camerainfo of right ir camera
+* `/feynman_camera/*/rgb/camera_info`:camerainfo of rgb camera
 * `/feynman_camera/*/cnn_info`:cnn bbox info,feynman_camera::cnn_info
 
 ## Useful Services
