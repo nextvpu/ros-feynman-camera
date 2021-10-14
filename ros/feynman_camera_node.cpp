@@ -10,7 +10,6 @@
 #include "feynman_camera/SetDepthMode.h"
 #include "feynman_camera/SetProjector.h"
 #include "feynman_camera/EnablePointCloud.h"
-#include "feynman_camera/GetCameraParam.h"
 #include "feynman_camera/temp_info.h"
 #include "feynman_camera/imu_frame.h"
 #include "feynman_camera/imu_info.h"
@@ -24,6 +23,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/CameraInfo.h>
 #include "ring_queue.h"
 #include <opencv2/opencv.hpp>
 //#include <pcl/ros/conversions.h>
