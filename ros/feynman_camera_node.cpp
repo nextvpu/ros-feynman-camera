@@ -83,31 +83,31 @@ int32_t removeDarkOutliers(
     int32_t sigmaThr,
     int8_t winsize)
 {
-  //img mean
+  // img mean
 
   Mat meanI;
   boxFilter(img, meanI, -1, Size(winsize, winsize), Point(-1, -1), true, 2);
 
-  //img - mean
+  // img - mean
   Mat diff;
-  cv::absdiff(img, meanI, diff); //todo: check: uint8 sub
+  cv::absdiff(img, meanI, diff); // todo: check: uint8 sub
 
-  //diff square
-  Mat sDiff = diff.mul(diff); //todo: check: mul out of range
-                              //box filter SAD
+  // diff square
+  Mat sDiff = diff.mul(diff); // todo: check: mul out of range
+                              // box filter SAD
   Mat sad;
   boxFilter(sDiff, sad, -1, Size(winsize, winsize), Point(-1, -1), true, 2);
-  //compare  mask1 mask2
+  // compare  mask1 mask2
   Mat mask1, mask2;
   mask1 = sad < sigmaThr;
   mask2 = meanI < pixThr;
-  //mask and op
+  // mask and op
   Mat mask = mask1 & mask2;
   Mat nmask;
   mask.convertTo(nmask, CV_16UC1, 1, 0);
-  //mask box filter
+  // mask box filter
 
-  //compare   //todo:simplify here
+  // compare   //todo:simplify here
   Mat ndepth;
   depth.copyTo(ndepth, 255 - mask);
   depth = ndepth;
@@ -116,20 +116,20 @@ int32_t removeDarkOutliers(
 
 std::vector<s_feynman_cam_param>
     g_cameraparam;
-//0.obtain device id from launch file
-//1.when device plugin,enumrate device and open it and recv data from it
-//2.while device id is not the one request,close it
-//3.while device id is the one request,open it and continue recv data from it
+// 0.obtain device id from launch file
+// 1.when device plugin,enumrate device and open it and recv data from it
+// 2.while device id is not the one request,close it
+// 3.while device id is the one request,open it and continue recv data from it
 
 bool handle_device_switchrectify_request(feynman_camera::SwitchRectifyRequest &req,
                                          feynman_camera::SwitchRectifyResponse &res)
 {
   if (req.rectifyornot == "rectify")
-  { //rectify
+  { // rectify
     feynman_setvpss();
   }
   else
-  { //not rectify,just vi
+  { // not rectify,just vi
     feynman_setvi();
   }
   return true;
@@ -167,7 +167,7 @@ bool handle_removedark_request(feynman_camera::RemoveDarkRequest &req,
 bool handle_savedepth_request(feynman_camera::SaveDepthRequest &req,
                               feynman_camera::SaveDepthResponse &res)
 {
-  //create task node and insert to queue of save depth task
+  // create task node and insert to queue of save depth task
   if (NULL == taskqueue)
   {
     taskqueue = new Ring_Queue(9, sizeof(SAVEDEPTHTASK));
@@ -185,30 +185,30 @@ bool handle_savedepth_request(feynman_camera::SaveDepthRequest &req,
     }
   }
   printf("ok to add savedepth task!\n");
-  //create tmp thread to save files
+  // create tmp thread to save files
 }
 bool handle_device_streammode_request(feynman_camera::SetStreamModeRequest &req,
                                       feynman_camera::SetStreamModeResponse &res)
 {
   if (req.mode == 0)
-  { //vi
-    //0.vi 1.vpss 2.depth 3.cnn
+  { // vi
+    // 0.vi 1.vpss 2.depth 3.cnn
     feynman_setmode(0);
     feynman_resetpipeline();
   }
   else if (req.mode == 1)
-  { //vpss
-    //0.vi 1.vpss 2.depth 3.cnn
+  { // vpss
+    // 0.vi 1.vpss 2.depth 3.cnn
     feynman_setmode(1);
     feynman_resetpipeline();
   }
   else if (req.mode == 2)
-  { //depth
+  { // depth
     feynman_setmode(2);
     feynman_resetpipeline();
   }
   else if (req.mode == 3)
-  { //cnn
+  { // cnn
     feynman_setmode(3);
     feynman_resetpipeline();
   }
@@ -232,24 +232,24 @@ bool handle_device_depthmode_request(feynman_camera::SetDepthModeRequest &req,
                                      feynman_camera::SetDepthModeResponse &res)
 {
   if (req.mode == "denoise")
-  { //vpss
-    //0.vi 1.vpss 2.depth 3.cnn
+  { // vpss
+    // 0.vi 1.vpss 2.depth 3.cnn
     feynman_setdepthdenoise(1);
     feynman_resetpipeline();
   }
   else if (req.mode == "fusion")
-  { //depth
-    //0.vi 1.vpss 2.depth 3.cnn
+  { // depth
+    // 0.vi 1.vpss 2.depth 3.cnn
     feynman_setdepthfusion(1);
     feynman_resetpipeline();
   }
   else if (req.mode == "zoom")
-  { //cnn
+  { // cnn
     feynman_setdepthzoom(1);
     feynman_resetpipeline();
   }
   else if (req.mode == "stitch")
-  { //cnn
+  { // cnn
     feynman_setdepthstitch(1);
     feynman_resetpipeline();
   }
@@ -340,6 +340,7 @@ typedef struct
   ros::Publisher depthrawrightpublisher;
   ros::Publisher temperaturepublisher;
   ros::Publisher dotcloudpublisher;
+  ros::Publisher depthcamerainfopublisher;
   ros::Publisher rgbpublisher;
   ros::Publisher rgbrawpublisher;
   ros::Publisher sensorrawleftpublisher;
@@ -424,7 +425,7 @@ void savecallback(void *data, void *userdata)
 
   if (tmptask != NULL)
   {
-    //save depth and rgb with same groupid
+    // save depth and rgb with same groupid
     FEYNMAN_USBHeaderDataPacket *tmppack = (FEYNMAN_USBHeaderDataPacket *)data;
     if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_DEPTH_IMAGE)
     {
@@ -436,7 +437,7 @@ void savecallback(void *data, void *userdata)
         FEYNMAN_USBHeaderDataPacket *mydata = g_savedepth[i];
         FEYNMAN_USB_IMAGE_HEADER *myheader = (FEYNMAN_USB_IMAGE_HEADER *)mydata->data;
         if (myheader->group_id == tmpheader->group_id && mydata->sub_type == FEYNMAN_RGB_IMAGE_SINGLE)
-        { //save depth and rgb
+        { // save depth and rgb
           sprintf(filename, "%s/depth-%u-%llu.raw", tmptask->filepath, tmpheader->group_id, tmpheader->timestamp);
           printf("filenums:%d,will write file:%s\n", tmptask->filenums, filename);
           FILE *fp = fopen(filename, "wb");
@@ -460,7 +461,7 @@ void savecallback(void *data, void *userdata)
         }
       }
       if (!hasrgb)
-      { //save depth to g_savedepth
+      { // save depth to g_savedepth
         FEYNMAN_USBHeaderDataPacket *tobesaved = (FEYNMAN_USBHeaderDataPacket *)malloc(sizeof(FEYNMAN_USBHeaderDataPacket) + tmppack->len);
         memcpy(tobesaved, tmppack, sizeof(FEYNMAN_USBHeaderDataPacket) + tmppack->len);
         g_savedepth.push_back(tobesaved);
@@ -476,7 +477,7 @@ void savecallback(void *data, void *userdata)
         FEYNMAN_USBHeaderDataPacket *mydata = g_savedepth[i];
         FEYNMAN_USB_IMAGE_HEADER *myheader = (FEYNMAN_USB_IMAGE_HEADER *)mydata->data;
         if (myheader->group_id == tmpheader->group_id && mydata->sub_type == FEYNMAN_DEPTH_IMAGE)
-        { //save depth and rgb
+        { // save depth and rgb
           sprintf(filename, "%s/rgb-%u-%llu.raw", tmptask->filepath, tmpheader->group_id, tmpheader->timestamp);
           printf("filenums:%d,will write file:%s\n", tmptask->filenums, filename);
           FILE *fp = fopen(filename, "wb");
@@ -500,7 +501,7 @@ void savecallback(void *data, void *userdata)
         }
       }
       if (!hasdepth)
-      { //save depth to g_savedepth
+      { // save depth to g_savedepth
         FEYNMAN_USBHeaderDataPacket *tobesaved = (FEYNMAN_USBHeaderDataPacket *)malloc(sizeof(FEYNMAN_USBHeaderDataPacket) + tmppack->len);
         memcpy(tobesaved, tmppack, sizeof(FEYNMAN_USBHeaderDataPacket) + tmppack->len);
         g_savedepth.push_back(tobesaved);
@@ -522,7 +523,7 @@ void imucallback(void *data, void *userdata)
       imudata.imu_frames.resize(tmpimudata->data_number);
       static uint64_t lastbegintimestamp = 0, lastendtimestamp = 0;
       int offset = tmpimudata->imu_data[0].timestamp - lastendtimestamp;
-      //printf("big packet offset:%d\n", offset);
+      // printf("big packet offset:%d\n", offset);
       if ((offset > 5000 || offset < 4000) && lastbegintimestamp != 0)
       {
         printf("warning,imu packet abnormal offset!!!:%d\n", offset);
@@ -563,7 +564,7 @@ void imucallback(void *data, void *userdata)
 }
 void rgbcallback(void *data, void *userdata)
 {
-  //printf("enter rgbcallback!\n");
+  // printf("enter rgbcallback!\n");
   DEVICEINFO *info = (DEVICEINFO *)userdata;
   FEYNMAN_USBHeaderDataPacket *tmppack = (FEYNMAN_USBHeaderDataPacket *)data;
   if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_RGB_IMAGE_SINGLE)
@@ -598,7 +599,7 @@ void rgbcallback(void *data, void *userdata)
       memcpy(in_ptr, buffer, data_size);
       //  printf("end memcpy!\n");
       new_image.header.stamp = ros::Time::now();
-      if (g_runconfig >= 2) //depth or cnn_demo
+      if (g_runconfig >= 2) // depth or cnn_demo
       {
         info->rgbpublisher.publish(new_image);
       }
@@ -627,10 +628,10 @@ void rgbcallback(void *data, void *userdata)
       caminfo.K[8] = 1.0;
 
       caminfo.R.assign(0.0);
-      //for (int i = 0; i < 9; i++)
+      // for (int i = 0; i < 9; i++)
       //{
-      //  caminfo.R[i] = p.r2l_r[i];
-      //}
+      //   caminfo.R[i] = p.r2l_r[i];
+      // }
       caminfo.R[0] = 1;
       caminfo.R[4] = 1;
       caminfo.R[8] = 1;
@@ -683,7 +684,7 @@ void depthcallback(void *data, void *userdata)
     }
     count++;
   }
-  //return;
+  // return;
   if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_DEPTH_IMAGE)
   {
     // ROS_INFO("depth data!\n");
@@ -742,7 +743,7 @@ void depthcallback(void *data, void *userdata)
       s_feynman_cam_param theparam = g_cameraparam[0];
       sensor_msgs::Image *new_image = new sensor_msgs::Image;
 
-      new_image->header.frame_id = "feynman_camera/depthraw";
+      new_image->header.frame_id = "feynman_camera/depth/image_raw";
       new_image->width = theparam.img_width;
       new_image->height = theparam.img_height;
       new_image->is_bigendian = 0;
@@ -756,9 +757,56 @@ void depthcallback(void *data, void *userdata)
 
       unsigned char *tmpimgdata = tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER);
       memcpy(in_ptr, tmpimgdata, data_size);
-
+      new_image->header.stamp = ros::Time::now();
+      static uint32_t depthseq = 0;
+      new_image->header.seq = depthseq;
+      depthseq++;
       info->depthrawpublisher.publish(*new_image);
+
+      sensor_msgs::CameraInfo caminfo;
+
+      caminfo.width = theparam.img_width;
+      caminfo.height = theparam.img_height;
+      caminfo.distortion_model = sensor_msgs::distortion_models::PLUMB_BOB;
+      caminfo.D.resize(5, 0.0);
+      caminfo.D[0] = 0;
+      caminfo.D[1] = 0;
+      caminfo.D[2] = 0;
+      caminfo.D[3] = 0;
+      caminfo.D[4] = 0;
+
+      caminfo.K.assign(0.0);
+      caminfo.K[0] = theparam.left_sensor_focus[0];
+      caminfo.K[2] = theparam.left_sensor_photocenter[0];
+      caminfo.K[4] = theparam.left_sensor_focus[1];
+      caminfo.K[5] = theparam.left_sensor_photocenter[1];
+      caminfo.K[8] = 1.0;
+
+      caminfo.R.assign(0.0);
+      // for (int i = 0; i < 9; i++)
+      //{
+      //   caminfo.R[i] = p.r2l_r[i];
+      // }
+      caminfo.R[0] = 1;
+      caminfo.R[4] = 1;
+      caminfo.R[8] = 1;
+
+      caminfo.P.assign(0.0);
+      caminfo.P[0] = caminfo.K[0];
+      caminfo.P[2] = caminfo.K[2];
+      caminfo.P[3] = (theparam.is_new_format ? theparam.left2right_extern_param[9] : theparam.left2right_extern_param[3]);
+      caminfo.P[5] = caminfo.K[4];
+      caminfo.P[6] = caminfo.K[5];
+      caminfo.P[7] = 0;
+      caminfo.P[10] = 1.0;
+      caminfo.P[11] = 0;
+      // Fill in header
+      caminfo.header.stamp = new_image->header.stamp;
+      caminfo.header.seq = new_image->header.seq;
+      caminfo.header.frame_id = "feynman_camera/depth/camerainfo";
+
       delete new_image;
+      info->depthcamerainfopublisher.publish(caminfo);
 
       //     printf("will dotcloud publish!\n");
       /////////////////////////will publish dot cloud
@@ -814,7 +862,7 @@ void depthcallback(void *data, void *userdata)
       memset(depthrgbmask, 0, width * height * sizeof(uint16_t));
       memset(depthrgbmaskview, 0, width * height * 3);
       memset(depthpseudo, 0, width * height * 3);
-      //printf("will convert dotclould!\n");
+      // printf("will convert dotclould!\n");
       for (int row = 0; row < height; row++)
       {
         for (int col = 0; col < width; col++)
@@ -833,7 +881,7 @@ void depthcallback(void *data, void *userdata)
           {
             unsigned char y, u, v;
             int result = feynman_getyuvfromindex(tmpeffectindex, &y, &u, &v);
-            //y = 26; u = 170; v = 122;
+            // y = 26; u = 170; v = 122;
             if (result >= 0)
             {
               uint8_t fr = (uint8_t)(y + 1.4075 * (v - 128));
@@ -873,7 +921,7 @@ void depthcallback(void *data, void *userdata)
                 {
                   unsigned char y, u, v;
                   int result = feynman_getyuvfromindex(effectindex, &y, &u, &v);
-                  //y = 26; u = 170; v = 122;
+                  // y = 26; u = 170; v = 122;
                   if (result >= 0)
                   {
                     uint8_t fr = (uint8_t)(y + 1.4075 * (v - 128));
@@ -892,11 +940,11 @@ void depthcallback(void *data, void *userdata)
         }
       }
 
-      //printf("after convert dotclould!\n");
-      //Convert the cloud to ROS message
+      // printf("after convert dotclould!\n");
+      // Convert the cloud to ROS message
       pcl::toROSMsg(*pcloud, *pnew_dotcloud);
 
-      //printf("after torosmsg!\n");
+      // printf("after torosmsg!\n");
       pnew_dotcloud->header.frame_id = "odom";
 
       info->dotcloudpublisher.publish(*pnew_dotcloud);
@@ -969,7 +1017,7 @@ void depthcallback(void *data, void *userdata)
 }
 void ircallback(void *data, void *userdata)
 {
-  //printf("enter ircallback!\n");
+  // printf("enter ircallback!\n");
   DEVICEINFO *info = (DEVICEINFO *)userdata;
   FEYNMAN_USBHeaderDataPacket *tmppack = (FEYNMAN_USBHeaderDataPacket *)data;
   if (hasstartpipeline == 0)
@@ -993,7 +1041,7 @@ void ircallback(void *data, void *userdata)
   }
   if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_IR_IMAGE_LEFT_VI)
   {
-    //ROS_INFO("depth left raw!\n");
+    // ROS_INFO("depth left raw!\n");
     if (g_cameraparam.size() == 1 && (tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER)) == g_cameraparam[0].img_width * g_cameraparam[0].img_height * 3 / 2)
     {
       s_feynman_cam_param theparam = g_cameraparam[0];
@@ -1025,7 +1073,7 @@ void ircallback(void *data, void *userdata)
   }
   else if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_IR_IMAGE_RIGHT_VI)
   {
-    //ROS_INFO("depth left raw!\n");
+    // ROS_INFO("depth left raw!\n");
     if (g_cameraparam.size() == 1 && (tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER)) == g_cameraparam[0].img_width * g_cameraparam[0].img_height * 3 / 2)
     {
       s_feynman_cam_param theparam = g_cameraparam[0];
@@ -1057,7 +1105,7 @@ void ircallback(void *data, void *userdata)
   }
   else if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_IR_IMAGE_LEFT_VPSS)
   {
-    //ROS_INFO("depth left raw!\n");
+    // ROS_INFO("depth left raw!\n");
     if (g_cameraparam.size() == 1 && (tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER)) == g_cameraparam[0].img_width * g_cameraparam[0].img_height * 3 / 2)
     {
       s_feynman_cam_param theparam = g_cameraparam[0];
@@ -1089,7 +1137,7 @@ void ircallback(void *data, void *userdata)
   }
   else if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_IR_IMAGE_RIGHT_VPSS)
   {
-    //ROS_INFO("depth left raw!\n");
+    // ROS_INFO("depth left raw!\n");
     if (g_cameraparam.size() == 1 && (tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER)) == g_cameraparam[0].img_width * g_cameraparam[0].img_height * 3 / 2)
     {
       s_feynman_cam_param theparam = g_cameraparam[0];
@@ -1121,7 +1169,7 @@ void ircallback(void *data, void *userdata)
   }
   else if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_DEPTH_IMAGE_LEFT_RAW)
   {
-    //ROS_INFO("depth left raw!\n");
+    // ROS_INFO("depth left raw!\n");
     if (g_cameraparam.size() == 1 && (tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER)) == g_cameraparam[0].img_width * g_cameraparam[0].img_height)
     {
       unsigned char *tmpimgdata = tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER);
@@ -1186,10 +1234,10 @@ void ircallback(void *data, void *userdata)
       caminfo.K[8] = 1.0;
 
       caminfo.R.assign(0.0);
-      //for (int i = 0; i < 9; i++)
+      // for (int i = 0; i < 9; i++)
       //{
-      //  caminfo.R[i] = p.r2l_r[i];
-      //}
+      //   caminfo.R[i] = p.r2l_r[i];
+      // }
       caminfo.R[0] = 1;
       caminfo.R[4] = 1;
       caminfo.R[8] = 1;
@@ -1272,10 +1320,10 @@ void ircallback(void *data, void *userdata)
       caminfo.K[8] = 1.0;
 
       caminfo.R.assign(0.0);
-      //for (int i = 0; i < 9; i++)
+      // for (int i = 0; i < 9; i++)
       //{
-      //  caminfo.R[i] = p.r2l_r[i];
-      //}
+      //   caminfo.R[i] = p.r2l_r[i];
+      // }
       caminfo.R[0] = 1;
       caminfo.R[4] = 1;
       caminfo.R[8] = 1;
@@ -1313,7 +1361,7 @@ void othercallback(void *data, void *userdata)
     feynman_camera::temp_info tempinfo;
     tempinfo.cputemp = tmpinfo->cpu_temperaure;
     tempinfo.projectortemp = tmpinfo->projector_temperaure[0];
-    //printf("camera fps:%d\n", tmpinfo->fps.fps);
+    // printf("camera fps:%d\n", tmpinfo->fps.fps);
 
     info->temperaturepublisher.publish(tempinfo);
     static bool g_isfirsttime = true;
@@ -1539,8 +1587,8 @@ int main(int argc, char *argv[])
   sprintf(tmpparamsstr, "feynman_camera/%d/depthmode", device_id);
   ros::ServiceServer devicesetdepthmodeservice = node_obj.advertiseService(tmpparamsstr, handle_device_depthmode_request);
 
-  //sprintf(tmpparamsstr, "feynman_camera/%d/cameraparam", device_id);
-  //ros::ServiceServer devicegetparamservice = node_obj.advertiseService(tmpparamsstr, handle_device_cameraparam_request);
+  // sprintf(tmpparamsstr, "feynman_camera/%d/cameraparam", device_id);
+  // ros::ServiceServer devicegetparamservice = node_obj.advertiseService(tmpparamsstr, handle_device_cameraparam_request);
   sprintf(tmpparamsstr, "feynman_camera/%d/setprojector", device_id);
   ros::ServiceServer devicesetprojectorservice = node_obj.advertiseService(tmpparamsstr, handle_device_setprojector_request);
 
@@ -1584,6 +1632,9 @@ int main(int argc, char *argv[])
 
   sprintf(tmpparamsstr, "/feynman_camera/%d/depth/dotcloud", device_id);
   info->dotcloudpublisher = node_obj.advertise<sensor_msgs::PointCloud2>(tmpparamsstr, 10);
+
+  sprintf(tmpparamsstr, "/feynman_camera/%d/depth/camera_info", device_id);
+  info->depthcamerainfopublisher = node_obj.advertise<sensor_msgs::CameraInfo>(tmpparamsstr, 10);
 
   sprintf(tmpparamsstr, "/feynman_camera/%d/rgb/image_rect_color", device_id);
   info->rgbpublisher = node_obj.advertise<sensor_msgs::Image>(tmpparamsstr, 10);

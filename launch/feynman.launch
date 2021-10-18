@@ -1,4 +1,8 @@
 <launch>
+<node pkg="depthimage_to_laserscan" type="depthimage_to_laserscan" name="depthimage_to_laser" output="screen" >
+    <remap from="image" to="feynman_camera/305419896/depth/image_raw"/>
+    <remap from="camera_info" to="feynman_camera/305419896/depth/camera_info"/>
+</node>
   <node name="feynmannode"
         pkg="feynman_camera"
         type="feynman_camera"
@@ -8,4 +12,6 @@
     <param name="resolution" value="640x400" />
     <param name="fps" value="30" />
   </node>
+<node pkg="rviz" type="rviz" name="rviz" />
+  <node pkg="tf" type="static_transform_publisher" name="tf_static" args="0 0 0 0 0 0 1 map camera_depth_frame 10"/>
 </launch>
