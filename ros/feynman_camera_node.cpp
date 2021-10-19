@@ -33,7 +33,8 @@
 #include <sensor_msgs/distortion_models.h>
 
 #include <string.h>
-
+#define MAXWIDTH 1280
+#define MAXHEIGHT 800
 int g_runconfig = -1;
 void resfpscallback(feynman_camera::resfpsConfig &config)
 {
@@ -589,7 +590,7 @@ void rgbcallback(void *data, void *userdata)
       static unsigned char *buffer = NULL;
       // printf("will malloc in rgb:%dx%dx3!\n", width, height);
       if (NULL == buffer)
-        buffer = (unsigned char *)malloc(width * height * 3);
+        buffer = (unsigned char *)malloc(MAXWIDTH * MAXHEIGHT * 3);
       unsigned char *tmpimgdata = tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER);
       //  printf("will convert nv12 to rgb24!\n");
       nv12_rgb24_std(width, height, tmpimgdata, tmpimgdata + width * height, width, width, buffer, width * 3, YCBCR_601);
@@ -856,9 +857,9 @@ void depthcallback(void *data, void *userdata)
                                             //   printf("will resize points!\n");
       pcloud->points.resize(pcloud->width * pcloud->height);
 
-      static uint16_t *depthrgbmask = (uint16_t *)malloc(width * height * sizeof(uint16_t));
-      static uint8_t *depthrgbmaskview = (uint8_t *)malloc(width * height * 3);
-      static uint8_t *depthpseudo = (uint8_t *)malloc(width * height * 3);
+      static uint16_t *depthrgbmask = (uint16_t *)malloc(MAXWIDTH * MAXHEIGHT * sizeof(uint16_t));
+      static uint8_t *depthrgbmaskview = (uint8_t *)malloc(MAXWIDTH * MAXHEIGHT * 3);
+      static uint8_t *depthpseudo = (uint8_t *)malloc(MAXWIDTH * MAXHEIGHT * 3);
       memset(depthrgbmask, 0, width * height * sizeof(uint16_t));
       memset(depthrgbmaskview, 0, width * height * 3);
       memset(depthpseudo, 0, width * height * 3);
@@ -1061,7 +1062,7 @@ void ircallback(void *data, void *userdata)
       int height = new_image.height;
       static unsigned char *rgb = NULL;
       if (NULL == rgb)
-        rgb = (unsigned char *)malloc(width * height * 3);
+        rgb = (unsigned char *)malloc(MAXWIDTH * MAXHEIGHT * 3);
       unsigned char *tmpimgdata = tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER);
       yuv420_rgb24_std(width, height, tmpimgdata, tmpimgdata + width * height, tmpimgdata + width * height + width * height / 4, width, width / 2, rgb, width * 3, YCBCR_601);
 
@@ -1093,7 +1094,7 @@ void ircallback(void *data, void *userdata)
       int height = new_image.height;
       static unsigned char *rgb = NULL;
       if (NULL == rgb)
-        rgb = (unsigned char *)malloc(width * height * 3);
+        rgb = (unsigned char *)malloc(MAXWIDTH * MAXHEIGHT * 3);
       unsigned char *tmpimgdata = tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER);
       yuv420_rgb24_std(width, height, tmpimgdata, tmpimgdata + width * height, tmpimgdata + width * height + width * height / 4, width, width / 2, rgb, width * 3, YCBCR_601);
 
@@ -1125,7 +1126,7 @@ void ircallback(void *data, void *userdata)
       int height = new_image.height;
       static unsigned char *rgb = NULL;
       if (NULL == rgb)
-        rgb = (unsigned char *)malloc(width * height * 3);
+        rgb = (unsigned char *)malloc(MAXWIDTH * MAXHEIGHT * 3);
       unsigned char *tmpimgdata = tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER);
       yuv420_rgb24_std(width, height, tmpimgdata, tmpimgdata + width * height, tmpimgdata + width * height + width * height / 4, width, width / 2, rgb, width * 3, YCBCR_601);
 
@@ -1157,7 +1158,7 @@ void ircallback(void *data, void *userdata)
       int height = new_image.height;
       static unsigned char *rgb = NULL;
       if (NULL == rgb)
-        rgb = (unsigned char *)malloc(width * height * 3);
+        rgb = (unsigned char *)malloc(MAXWIDTH * MAXHEIGHT * 3);
       unsigned char *tmpimgdata = tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER);
       yuv420_rgb24_std(width, height, tmpimgdata, tmpimgdata + width * height, tmpimgdata + width * height + width * height / 4, width, width / 2, rgb, width * 3, YCBCR_601);
 
@@ -1178,7 +1179,7 @@ void ircallback(void *data, void *userdata)
 
       if (g_leftdepth == NULL)
       {
-        g_leftdepth = (uint8_t *)malloc(1280 * 800);
+        g_leftdepth = (uint8_t *)malloc(MAXWIDTH * MAXHEIGHT);
       }
       memcpy(g_leftdepth, tmpimgdata, width * height);
 
