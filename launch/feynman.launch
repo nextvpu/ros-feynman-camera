@@ -11,6 +11,12 @@
     <param name="device_id" value="305419896" />
     <param name="resolution" value="640x400" />
     <param name="fps" value="30" />
+    <param name="pubrgb" value="false" />
+    <param name="pubir" value="false" />
+    <param name="pubdotcloud" value="false" />
+    <param name="pubdepth" value="true" />
+    <param name="savedata" value="false" />
+    <param name="pubdepthalign" value="false" />
   </node>
 <node pkg="rviz" type="rviz" name="rviz" />
   <node pkg="tf" type="static_transform_publisher" name="tf_static" args="0 0 0 0 0 0 1 map camera_depth_frame 10"/>

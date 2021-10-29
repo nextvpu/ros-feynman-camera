@@ -15,7 +15,7 @@ generate_dynamic_reconfigure_options(
       cfg/resfps.cfg
 )
    
-SET(CMAKE_CXX_FLAGS "-g")
+SET(CMAKE_CXX_FLAGS "-p -g")
 #MACHINE = $(shell uname -m)
 execute_process(COMMAND uname -m  OUTPUT_VARIABLE  MACHINES )
 execute_process(COMMAND getconf LONG_BIT  OUTPUT_VARIABLE  MACHINES_BIT )

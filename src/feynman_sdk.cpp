@@ -774,7 +774,7 @@ void feynman_refresh(DEVICECALLBACK callback, void *userdata)
 }
 static int usb_hal_read(uint8_t *data, int len, int *bytesTransffered)
 {
-	int32_t timeout = 500;
+	int32_t timeout = 2000;
 
 	int ret = libusb_bulk_transfer(g_h_dev_usb, FEYNMAN_ENDPOINT_IN, (unsigned char *)data, len, bytesTransffered, timeout);
 
@@ -1021,12 +1021,12 @@ static void *saveprocessthread(void *param)
 		if (p)
 		{
 			int len = p->len;
-			uint8_t *tmpbuf = (uint8_t *)malloc(len);
+			static uint8_t *tmpbuf = (uint8_t *)malloc(1280 * 800 * 3);
 			memcpy(tmpbuf, (unsigned char *)p->buffer, len);
 			savepktqueue->SOLO_Read_Over();
 
 			callback(tmpbuf, connectuserdata);
-			free(tmpbuf);
+			//	free(tmpbuf);
 		}
 		else
 		{
@@ -1039,7 +1039,7 @@ static void *saveprocessthread(void *param)
 			outtime.tv_sec = now.tv_sec + 5;
 			outtime.tv_nsec = now.tv_usec * 1000; 
     		int ret = pthread_cond_timedwait(&g_cond,NULL, &outtime);*/
-			usleep(1000 * 1);
+			usleep(10000 * 1);
 #endif
 		}
 	}
@@ -1073,12 +1073,12 @@ static void *imuprocessthread(void *param)
 		if (p)
 		{
 			int len = p->len;
-			uint8_t *tmpbuf = (uint8_t *)malloc(len);
+			uint8_t *tmpbuf = (uint8_t *)malloc(1280 * 800);
 			memcpy(tmpbuf, (unsigned char *)p->buffer, len);
 			imupktqueue->SOLO_Read_Over();
 
 			callback(tmpbuf, connectuserdata);
-			free(tmpbuf);
+			//		free(tmpbuf);
 		}
 		else
 		{
@@ -1091,7 +1091,7 @@ static void *imuprocessthread(void *param)
 			outtime.tv_sec = now.tv_sec + 5;
 			outtime.tv_nsec = now.tv_usec * 1000; 
     		int ret = pthread_cond_timedwait(&g_cond,NULL, &outtime);*/
-			usleep(1000 * 1);
+			usleep(10000 * 1);
 #endif
 		}
 	}
@@ -1126,12 +1126,12 @@ rgbprocessthread(void *param)
 		if (p)
 		{
 			int len = p->len;
-			uint8_t *tmpbuf = (uint8_t *)malloc(len);
+			static uint8_t *tmpbuf = (uint8_t *)malloc(1280 * 800 * 3);
 			memcpy(tmpbuf, (unsigned char *)p->buffer, len);
 			rgbpktqueue->SOLO_Read_Over();
 
 			callback(tmpbuf, connectuserdata);
-			free(tmpbuf);
+			//	free(tmpbuf);
 		}
 		else
 		{
@@ -1144,7 +1144,7 @@ rgbprocessthread(void *param)
 			outtime.tv_sec = now.tv_sec + 5;
 			outtime.tv_nsec = now.tv_usec * 1000; 
     		int ret = pthread_cond_timedwait(&g_cond,NULL, &outtime);*/
-			usleep(1000 * 1);
+			usleep(10000 * 1);
 #endif
 		}
 	}
@@ -1179,12 +1179,12 @@ irprocessthread(void *param)
 		if (p)
 		{
 			int len = p->len;
-			uint8_t *tmpbuf = (uint8_t *)malloc(len);
+			static uint8_t *tmpbuf = (uint8_t *)malloc(1280 * 800 * 2);
 			memcpy(tmpbuf, (unsigned char *)p->buffer, len);
 			irpktqueue->SOLO_Read_Over();
 
 			callback(tmpbuf, connectuserdata);
-			free(tmpbuf);
+			//	free(tmpbuf);
 		}
 		else
 		{
@@ -1197,7 +1197,7 @@ irprocessthread(void *param)
 			outtime.tv_sec = now.tv_sec + 5;
 			outtime.tv_nsec = now.tv_usec * 1000; 
     		int ret = pthread_cond_timedwait(&g_cond,NULL, &outtime);*/
-			usleep(1000 * 1);
+			usleep(10000 * 1);
 #endif
 		}
 	}
@@ -1240,12 +1240,12 @@ static void *depthprocessthread(void *param)
 		if (p)
 		{
 			int len = p->len;
-			uint8_t *tmpbuf = (uint8_t *)malloc(len);
+			uint8_t *tmpbuf = (uint8_t *)malloc(1280 * 800 * 3);
 			memcpy(tmpbuf, (unsigned char *)p->buffer, len);
 			depthpktqueue->SOLO_Read_Over();
-
-			callback(tmpbuf, connectuserdata);
-			free(tmpbuf);
+			if (callback != NULL)
+				callback(tmpbuf, connectuserdata);
+			//			free(tmpbuf);
 		}
 		else
 		{
@@ -1258,7 +1258,7 @@ static void *depthprocessthread(void *param)
 			outtime.tv_sec = now.tv_sec + 5;
 			outtime.tv_nsec = now.tv_usec * 1000; 
     		int ret = pthread_cond_timedwait(&g_cond,NULL, &outtime);*/
-			usleep(1000 * 1);
+			usleep(10000 * 1);
 #endif
 		}
 	}
@@ -1688,11 +1688,15 @@ BOOL feynman_connectcamera(const char *devicename,
 #else
 		//	pthread_t threadID;
 		pthread_create(&recvthread, 0, usb_loop_recv, (void *)othercallback);
-		pthread_create(&depththread, 0, depthprocessthread, (void *)depthcallback);
-		pthread_create(&irthread, 0, irprocessthread, (void *)ircallback);
-		pthread_create(&rgbthread, 0, rgbprocessthread, (void *)rgbcallback);
+		if (depthcallback != NULL)
+			pthread_create(&depththread, 0, depthprocessthread, (void *)depthcallback);
+		if (ircallback != NULL)
+			pthread_create(&irthread, 0, irprocessthread, (void *)ircallback);
+		if (rgbcallback != NULL)
+			pthread_create(&rgbthread, 0, rgbprocessthread, (void *)rgbcallback);
 		pthread_create(&imuthread, 0, imuprocessthread, (void *)imucallback);
-		pthread_create(&savethread, 0, saveprocessthread, (void *)savecallback);
+		if (savecallback != NULL)
+			pthread_create(&savethread, 0, saveprocessthread, (void *)savecallback);
 		pthread_create(&sendthread, 0, usb_loop_send, (void *)0);
 #endif
 		s_hasconnect = TRUE;
