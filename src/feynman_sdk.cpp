@@ -883,7 +883,7 @@ static void on_usb_data_receive(uint8_t *data, int len, FRAMECALLBACK callback)
 		}
 		else
 		{
-			printf("fail image one!\n");
+			//printf("fail image one!\n");
 		}
 
 		if (tmppack->sub_type == FEYNMAN_DEPTH_IMAGE)
@@ -898,7 +898,7 @@ static void on_usb_data_receive(uint8_t *data, int len, FRAMECALLBACK callback)
 			}
 			else
 			{
-				printf("fail image one!\n");
+				//printf("fail image one!\n");
 			}
 		}
 		if (tmppack->sub_type == FEYNMAN_DEPTH_IMAGE_LEFT_RAW)
@@ -913,7 +913,7 @@ static void on_usb_data_receive(uint8_t *data, int len, FRAMECALLBACK callback)
 			}
 			else
 			{
-				printf("fail image one!\n");
+				//printf("fail image one!\n");
 			}
 			p = (pkt_info_custom_t *)irpktqueue->SOLO_Write();
 			if (p)
@@ -924,7 +924,7 @@ static void on_usb_data_receive(uint8_t *data, int len, FRAMECALLBACK callback)
 			}
 			else
 			{
-				printf("fail image one!\n");
+				//printf("fail image one!\n");
 			}
 		}
 		if (tmppack->sub_type == FEYNMAN_DEPTH_IMAGE_RIGHT_RAW ||
@@ -943,7 +943,7 @@ static void on_usb_data_receive(uint8_t *data, int len, FRAMECALLBACK callback)
 			}
 			else
 			{
-				printf("fail image one!\n");
+				//printf("fail image one!\n");
 			}
 		}
 		if (tmppack->sub_type == FEYNMAN_RGB_IMAGE_SINGLE)
@@ -958,7 +958,7 @@ static void on_usb_data_receive(uint8_t *data, int len, FRAMECALLBACK callback)
 			}
 			else
 			{
-				printf("fail image one!\n");
+				//printf("fail image one!\n");
 			}
 		}
 	}
