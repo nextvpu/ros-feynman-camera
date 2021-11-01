@@ -17,6 +17,9 @@
     <param name="pubdepth" value="true" />
     <param name="savedata" value="false" />
     <param name="pubdepthalign" value="false" />
+    <param name="confidence" value="false" />
+    <param name="pubpseudo" value="false" />
+    <param name="pubimu" value="true" />
   </node>
 <node pkg="rviz" type="rviz" name="rviz" />
   <node pkg="tf" type="static_transform_publisher" name="tf_static" args="0 0 0 0 0 0 1 map camera_depth_frame 10"/>

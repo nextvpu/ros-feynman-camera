@@ -1694,7 +1694,8 @@ BOOL feynman_connectcamera(const char *devicename,
 			pthread_create(&irthread, 0, irprocessthread, (void *)ircallback);
 		if (rgbcallback != NULL)
 			pthread_create(&rgbthread, 0, rgbprocessthread, (void *)rgbcallback);
-		pthread_create(&imuthread, 0, imuprocessthread, (void *)imucallback);
+		if (imucallback != NULL)
+			pthread_create(&imuthread, 0, imuprocessthread, (void *)imucallback);
 		if (savecallback != NULL)
 			pthread_create(&savethread, 0, saveprocessthread, (void *)savecallback);
 		pthread_create(&sendthread, 0, usb_loop_send, (void *)0);

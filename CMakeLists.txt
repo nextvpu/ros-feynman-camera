@@ -50,6 +50,7 @@ add_service_files(
   SetDepthMode.srv
   SetProjector.srv
   EnablePointCloud.srv
+  EnableIMU.srv
   SwitchRectify.srv
   SaveDepth.srv
   RemoveDark.srv

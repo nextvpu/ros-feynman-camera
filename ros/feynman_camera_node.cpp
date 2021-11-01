@@ -10,6 +10,7 @@
 #include "feynman_camera/SetDepthMode.h"
 #include "feynman_camera/SetProjector.h"
 #include "feynman_camera/EnablePointCloud.h"
+#include "feynman_camera/EnableIMU.h"
 #include "feynman_camera/temp_info.h"
 #include "feynman_camera/imu_frame.h"
 #include "feynman_camera/imu_info.h"
@@ -268,6 +269,14 @@ bool handle_device_enablepointcloud_request(feynman_camera::EnablePointCloudRequ
 
   return true;
 }
+bool handle_device_enableimu_request(feynman_camera::EnableIMURequest &req,
+                                     feynman_camera::EnableIMUResponse &res)
+{
+
+  feynman_imuenable(req.enable);
+
+  return true;
+}
 bool handle_device_setprojector_request(feynman_camera::SetProjectorRequest &req,
                                         feynman_camera::SetProjectorResponse &res)
 {
@@ -364,6 +373,9 @@ typedef struct
   bool pubdepth;
   bool savedata;
   bool pubdepthalign;
+  bool pubpseudo;
+  bool confidence;
+  bool pubimu;
 } DEVICEINFO;
 
 int hasstartpipeline = 0;
@@ -385,7 +397,7 @@ void savecallback(void *data, void *userdata)
       int width = g_cameraparam[0].img_width;
       int height = g_cameraparam[0].img_height;
 
-      if (g_leftdepth != NULL && g_removedark && (tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER)) == width * height * 2)
+      if (info->confidence && g_leftdepth != NULL && g_removedark && (tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER)) == width * height * 2)
       {
         Mat *tempdepth = new Mat(height, width, CV_16U, Scalar::all(0));
         // 循环赋值
@@ -760,7 +772,7 @@ void depthcallback(void *data, void *userdata)
       int width = g_cameraparam[0].img_width;
       int height = g_cameraparam[0].img_height;
 
-      if (g_leftdepth != NULL && g_removedark && (tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER)) == width * height * 2)
+      if (info->confidence && g_leftdepth != NULL && g_removedark && (tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER)) == width * height * 2)
       {
         Mat tempdepth = Mat(height, width, CV_16U, Scalar::all(0));
         // 循环赋值
@@ -937,67 +949,74 @@ void depthcallback(void *data, void *userdata)
       memset(depthrgbmaskview, 0, width * height * 3);
       memset(depthpseudo, 0, width * height * 3);
       // printf("will convert dotclould!\n");
-      for (int row = 0; row < height; row++)
+      if (info->pubdepthalign || info->pubpseudo || info->pubdotcloud)
       {
-        for (int col = 0; col < width; col++)
+        for (int row = 0; row < height; row++)
         {
-          int index = row * width + col;
-          uint16_t depth = *(tmppic + row * width + col);
-          MYRGB color;
-          color.r = 0;
-          color.g = 0;
-          color.b = 0;
-          if (depth >= DEPTHMIN && depth <= DEPTHMAX)
+          for (int col = 0; col < width; col++)
           {
-            color = *(g_colortable + depth);
-
-            *(depthpseudo + (row * width + col) * 3) = color.r;
-            *(depthpseudo + (row * width + col) * 3 + 1) = color.g;
-            *(depthpseudo + (row * width + col) * 3 + 2) = color.b;
-          }
-          else
-          {
-            *(depthpseudo + (row * width + col) * 3) = 0;
-            *(depthpseudo + (row * width + col) * 3 + 1) = 0;
-            *(depthpseudo + (row * width + col) * 3 + 2) = 0;
-          }
-
-          double X = ((double)col - LEFTCAMERAX) * (double)depth / LEFTCAMERAFX;
-          double Y = ((double)row - LEFTCAMERAY) * (double)depth / LEFTCAMERAFY;
-          double Z = (double)depth;
-          if (info->pubdotcloud)
-          {
-            pcloud->points[index].x = X / 1000.0;
-            pcloud->points[index].y = Y / 1000.0;
-            pcloud->points[index].z = Z / 1000.0;
-          }
-          ////////////////////////////////////////////////
-          /////////////////��ʼ��depthdotcloud->rgbdotcloud
-          if (depth > 0 && info->pubdepthalign)
-          {
-            float rgbx = (DEPTHINRGBROTATE[0] * X + DEPTHINRGBROTATE[1] * Y + DEPTHINRGBROTATE[2] * Z + DEPTHINRGBOFFSET[0]) / 1000.0;
-            float rgby = (DEPTHINRGBROTATE[3] * X + DEPTHINRGBROTATE[4] * Y + DEPTHINRGBROTATE[5] * Z + DEPTHINRGBOFFSET[1]) / 1000.0;
-            float rgbz = (DEPTHINRGBROTATE[6] * X + DEPTHINRGBROTATE[7] * Y + DEPTHINRGBROTATE[8] * Z + DEPTHINRGBOFFSET[2]) / 1000.0;
-            /////////////////rgbdotcloud->rgb
-            if (rgbz > 0.0001)
+            int index = row * width + col;
+            uint16_t depth = *(tmppic + row * width + col);
+            MYRGB color;
+            color.r = 0;
+            color.g = 0;
+            color.b = 0;
+            if (depth >= DEPTHMIN && depth <= DEPTHMAX)
             {
-              float tmpx = rgbx / rgbz, tmpy = rgby / rgbz;
-
-              int resultu = (int)(tmpx * RGBFX + RGBX + 0.5);
-              int resultv = (int)(tmpy * RGBFY + RGBY + 0.5);
-              //	printf("resultuv:%d,%d\n", resultu, resultv);
-              if (resultu >= 0 && resultu < width && resultv >= 0 && resultv < height)
+              color = *(g_colortable + depth);
+              if (info->pubpseudo)
               {
-                *(depthrgbmask + (resultv * width + resultu)) = depth;
-                *(depthrgbmaskview + (resultv * width + resultu) * 3) = color.r;
-                *(depthrgbmaskview + (resultv * width + resultu) * 3 + 1) = color.g;
-                *(depthrgbmaskview + (resultv * width + resultu) * 3 + 2) = color.b;
+                *(depthpseudo + (row * width + col) * 3) = color.r;
+                *(depthpseudo + (row * width + col) * 3 + 1) = color.g;
+                *(depthpseudo + (row * width + col) * 3 + 2) = color.b;
+              }
+            }
+            else
+            {
+              if (info->pubpseudo)
+              {
+                *(depthpseudo + (row * width + col) * 3) = 0;
+                *(depthpseudo + (row * width + col) * 3 + 1) = 0;
+                *(depthpseudo + (row * width + col) * 3 + 2) = 0;
+              }
+            }
+
+            double X = ((double)col - LEFTCAMERAX) * (double)depth / LEFTCAMERAFX;
+            double Y = ((double)row - LEFTCAMERAY) * (double)depth / LEFTCAMERAFY;
+            double Z = (double)depth;
+            if (info->pubdotcloud)
+            {
+              pcloud->points[index].x = X / 1000.0;
+              pcloud->points[index].y = Y / 1000.0;
+              pcloud->points[index].z = Z / 1000.0;
+            }
+            ////////////////////////////////////////////////
+            /////////////////��ʼ��depthdotcloud->rgbdotcloud
+            if (depth > 0 && info->pubdepthalign)
+            {
+              float rgbx = (DEPTHINRGBROTATE[0] * X + DEPTHINRGBROTATE[1] * Y + DEPTHINRGBROTATE[2] * Z + DEPTHINRGBOFFSET[0]) / 1000.0;
+              float rgby = (DEPTHINRGBROTATE[3] * X + DEPTHINRGBROTATE[4] * Y + DEPTHINRGBROTATE[5] * Z + DEPTHINRGBOFFSET[1]) / 1000.0;
+              float rgbz = (DEPTHINRGBROTATE[6] * X + DEPTHINRGBROTATE[7] * Y + DEPTHINRGBROTATE[8] * Z + DEPTHINRGBOFFSET[2]) / 1000.0;
+              /////////////////rgbdotcloud->rgb
+              if (rgbz > 0.0001)
+              {
+                float tmpx = rgbx / rgbz, tmpy = rgby / rgbz;
+
+                int resultu = (int)(tmpx * RGBFX + RGBX + 0.5);
+                int resultv = (int)(tmpy * RGBFY + RGBY + 0.5);
+                //	printf("resultuv:%d,%d\n", resultu, resultv);
+                if (resultu >= 0 && resultu < width && resultv >= 0 && resultv < height)
+                {
+                  *(depthrgbmask + (resultv * width + resultu)) = depth;
+                  *(depthrgbmaskview + (resultv * width + resultu) * 3) = color.r;
+                  *(depthrgbmaskview + (resultv * width + resultu) * 3 + 1) = color.g;
+                  *(depthrgbmaskview + (resultv * width + resultu) * 3 + 2) = color.b;
+                }
               }
             }
           }
         }
       }
-
       if (info->pubdotcloud)
       {
         // printf("after convert dotclould!\n");
@@ -1054,26 +1073,30 @@ void depthcallback(void *data, void *userdata)
         //  printf("end memcpy!\n");
         info->depthalignrgbviewpublisher.publish(alignimage);
       }
-      sensor_msgs::Image pseudoimage;
 
-      pseudoimage.header.frame_id = "feynman_camera/depthpseudo";
-      pseudoimage.width = theparam.img_width;
-      pseudoimage.height = theparam.img_height;
-      pseudoimage.is_bigendian = 0;
-      pseudoimage.encoding = sensor_msgs::image_encodings::RGB8;
-      pseudoimage.step = 3 * pseudoimage.width;
+      if (info->pubpseudo)
+      {
+        sensor_msgs::Image pseudoimage;
 
-      data_size = pseudoimage.step * pseudoimage.height;
-      pseudoimage.data.resize(data_size);
+        pseudoimage.header.frame_id = "feynman_camera/depthpseudo";
+        pseudoimage.width = theparam.img_width;
+        pseudoimage.height = theparam.img_height;
+        pseudoimage.is_bigendian = 0;
+        pseudoimage.encoding = sensor_msgs::image_encodings::RGB8;
+        pseudoimage.step = 3 * pseudoimage.width;
 
-      width = pseudoimage.width;
-      height = pseudoimage.height;
-      //   printf("ok convert nv12 to rgb24!\n");
-      unsigned char *inpseudo_ptr = reinterpret_cast<unsigned char *>(&pseudoimage.data[0]);
-      //   printf("will memcpy:%d!%d\n", data_size, width * height * 3);
-      memcpy(inpseudo_ptr, depthpseudo, data_size);
-      //  printf("end memcpy!\n");
-      info->depthpseudopublisher.publish(pseudoimage);
+        data_size = pseudoimage.step * pseudoimage.height;
+        pseudoimage.data.resize(data_size);
+
+        width = pseudoimage.width;
+        height = pseudoimage.height;
+        //   printf("ok convert nv12 to rgb24!\n");
+        unsigned char *inpseudo_ptr = reinterpret_cast<unsigned char *>(&pseudoimage.data[0]);
+        //   printf("will memcpy:%d!%d\n", data_size, width * height * 3);
+        memcpy(inpseudo_ptr, depthpseudo, data_size);
+        //  printf("end memcpy!\n");
+        info->depthpseudopublisher.publish(pseudoimage);
+      }
     }
   }
 }
@@ -1575,7 +1598,7 @@ void *devicethread(void *param)
     ROS_INFO("device:%d connected!\n", info->device_id);
 
     feynman_connectcamera(info->devicename,
-                          imucallback,
+                          info->pubimu ? imucallback : NULL,
                           info->savedata ? savecallback : NULL,
                           info->pubdepth ? depthcallback : NULL,
                           info->pubir ? ircallback : NULL,
@@ -1635,6 +1658,25 @@ int main(int argc, char *argv[])
     printf("fail to get pubdotcloud from param!");
     exit(0);
   }
+
+  if (!ros::param::get("/feynmannode/confidence", info->confidence))
+  {
+    printf("fail to get confidence from param!");
+    exit(0);
+  }
+
+  if (!ros::param::get("/feynmannode/pubpseudo", info->pubpseudo))
+  {
+    printf("fail to get pubpseudo from param!");
+    exit(0);
+  }
+
+  if (!ros::param::get("/feynmannode/pubimu", info->pubimu))
+  {
+    printf("fail to get pubimu from param!");
+    exit(0);
+  }
+
   if (!ros::param::get("/feynmannode/device_id", device_id))
   {
     printf("fail to get device id from param!\n");
@@ -1655,6 +1697,7 @@ int main(int argc, char *argv[])
     printf("fail to get fps from param!");
     exit(0);
   }
+
   ROS_INFO("got fps:%d from launch!\n", fps);
   if ((resolutionstr != "1280x800" &&
        resolutionstr != "1280x720" &&
@@ -1694,6 +1737,9 @@ int main(int argc, char *argv[])
 
   sprintf(tmpparamsstr, "feynman_camera/%d/enablepointcloud", device_id);
   ros::ServiceServer enablepointcloudservice = node_obj.advertiseService(tmpparamsstr, handle_device_enablepointcloud_request);
+
+  sprintf(tmpparamsstr, "feynman_camera/%d/enableimu", device_id);
+  ros::ServiceServer enableimuservice = node_obj.advertiseService(tmpparamsstr, handle_device_enableimu_request);
 
   sprintf(tmpparamsstr, "feynman_camera/%d/exposure", device_id);
   ros::ServiceServer devicesetexposureservice = node_obj.advertiseService(tmpparamsstr, handle_device_exposure_request);
