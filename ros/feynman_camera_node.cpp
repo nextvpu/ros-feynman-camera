@@ -378,7 +378,7 @@ typedef struct
   bool pubimu;
 } DEVICEINFO;
 
-int hasstartpipeline = 0;
+//int hasstartpipeline = 0;
 int g_hasgotparam = 0;
 std::vector<FEYNMAN_USBHeaderDataPacket *> g_savedepth;
 void savecallback(void *data, void *userdata)
@@ -1419,13 +1419,13 @@ void othercallback(void *data, void *userdata)
 {
   DEVICEINFO *info = (DEVICEINFO *)userdata;
   FEYNMAN_USBHeaderDataPacket *tmppack = (FEYNMAN_USBHeaderDataPacket *)data;
-
+  /*
   if (hasstartpipeline == 0)
   {
     hasstartpipeline = 1;
     ROS_INFO("will start pipeline!\n");
     feynman_startpipeline();
-  }
+  }*/
   static time_t lastseconds = 0;
   if ((time(NULL) - lastseconds) > 5)
   {
