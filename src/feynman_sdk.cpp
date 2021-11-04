@@ -1240,7 +1240,7 @@ static void *depthprocessthread(void *param)
 		if (p)
 		{
 			int len = p->len;
-			uint8_t *tmpbuf = (uint8_t *)malloc(1280 * 800 * 3);
+			static uint8_t *tmpbuf = (uint8_t *)malloc(1280 * 800 * 3);
 			memcpy(tmpbuf, (unsigned char *)p->buffer, len);
 			depthpktqueue->SOLO_Read_Over();
 			if (callback != NULL)
