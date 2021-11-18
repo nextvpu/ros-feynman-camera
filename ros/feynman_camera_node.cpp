@@ -25,6 +25,7 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/CameraInfo.h>
+#include <sensor_msgs/Imu.h>
 #include "ring_queue.h"
 #include <opencv2/opencv.hpp>
 //#include <pcl/ros/conversions.h>
@@ -118,6 +119,20 @@ int32_t removeDarkOutliers(
   depth.copyTo(ndepth, 255 - mask);
   depth = ndepth;
   return 0;
+}
+
+ros::Time hardTimeToSoftTime(NVP_U64 hard_time) {
+  static ros::Time soft_time_begin(ros::Time::now());
+  static NVP_U64 hard_time_begin(hard_time*1000);
+  NVP_U64 time_nsec = hard_time*1000 - hard_time_begin + soft_time_begin.toNSec();
+  ros::Time time ;
+  time.fromNSec(time_nsec);
+  return time;
+}
+
+inline double deg2rad(const double& deg)
+{
+  return (deg*M_PI/180.0);
 }
 
 std::vector<s_feynman_cam_param>
@@ -364,6 +379,7 @@ typedef struct
   ros::Publisher cnnpublisher;
   ros::Publisher logpublisher;
   ros::Publisher imupublisher;
+  ros::Publisher imupublisher_single;
   ros::Publisher depthalignrgbpublisher;
   ros::Publisher depthalignrgbviewpublisher;
   ros::Publisher depthpseudopublisher;
@@ -580,6 +596,21 @@ void imucallback(void *data, void *userdata)
         imudata.imu_frames[i].magz = tmpimudata->imu_data[i].stMagnRawData.s16Z;
         imudata.imu_frames[i].temp = tmpimudata->imu_data[i].s16TemRawData;
         imudata.imu_frames[i].timestamp = tmpimudata->imu_data[i].timestamp;
+
+        //pub single
+        sensor_msgs::Imu imu_msg;
+        imu_msg.header.frame_id = "imu";
+//        imu_msg.header.stamp.fromNSec(tmpimudata->imu_data[i].timestamp*1e3);
+        imu_msg.header.stamp = hardTimeToSoftTime(tmpimudata->imu_data[i].timestamp);
+        imu_msg.angular_velocity.x = deg2rad(tmpimudata->imu_data[i].stGyroRawData.s16X);
+        imu_msg.angular_velocity.y = deg2rad(tmpimudata->imu_data[i].stGyroRawData.s16Y);
+        imu_msg.angular_velocity.z = deg2rad(tmpimudata->imu_data[i].stGyroRawData.s16Z);
+        imu_msg.linear_acceleration.x = tmpimudata->imu_data[i].stAccelRawData.s16X;
+        imu_msg.linear_acceleration.y = tmpimudata->imu_data[i].stAccelRawData.s16Y;
+        imu_msg.linear_acceleration.z = tmpimudata->imu_data[i].stAccelRawData.s16Z;
+
+        if (info->imupublisher_single.getNumSubscribers() > 0)
+          info->imupublisher_single.publish(imu_msg);
       }
     }
     else
@@ -593,6 +624,7 @@ void imucallback(void *data, void *userdata)
 }
 void rgbcallback(void *data, void *userdata)
 {
+  static unsigned int count = 0;
   // printf("enter rgbcallback!\n");
   DEVICEINFO *info = (DEVICEINFO *)userdata;
   if (!info->pubrgb)
@@ -603,6 +635,9 @@ void rgbcallback(void *data, void *userdata)
   {
     if (g_cameraparam.size() == 1 && (tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER)) == g_cameraparam[0].img_width * g_cameraparam[0].img_height * 3 / 2)
     {
+      FEYNMAN_USB_IMAGE_HEADER image_header;
+      memcpy(&image_header, tmppack->data, sizeof(FEYNMAN_USB_IMAGE_HEADER));
+
       s_feynman_cam_param theparam = g_cameraparam[0];
       sensor_msgs::Image new_image;
 
@@ -630,9 +665,11 @@ void rgbcallback(void *data, void *userdata)
       //   printf("will memcpy:%d!%d\n", data_size, width * height * 3);
       memcpy(in_ptr, buffer, data_size);
       //  printf("end memcpy!\n");
-      new_image.header.stamp = ros::Time::now();
+//      new_image.header.stamp = ros::Time::now();
+      new_image.header.stamp = hardTimeToSoftTime(image_header.timestamp);
       if (g_runconfig >= 2) // depth or cnn_demo
       {
+//        if (count++ % 8 == 0) // for calibration
         info->rgbpublisher.publish(new_image);
       }
       else
@@ -734,6 +771,10 @@ void depthcallback(void *data, void *userdata)
 {
   DEVICEINFO *info = (DEVICEINFO *)userdata;
   FEYNMAN_USBHeaderDataPacket *tmppack = (FEYNMAN_USBHeaderDataPacket *)data;
+
+  FEYNMAN_USB_IMAGE_HEADER image_header;
+  memcpy(&image_header, tmppack->data, sizeof(FEYNMAN_USB_IMAGE_HEADER));
+
   if (!info->pubdepth)
     return;
   if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_DEPTH_IMAGE)
@@ -834,7 +875,8 @@ void depthcallback(void *data, void *userdata)
 
       unsigned char *tmpimgdata = tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER);
       memcpy(in_ptr, tmpimgdata, data_size);
-      new_image->header.stamp = ros::Time::now();
+//      new_image->header.stamp = ros::Time::now();
+      new_image->header.stamp = hardTimeToSoftTime(image_header.timestamp);
       static uint32_t depthseq = 0;
       new_image->header.seq = depthseq;
       depthseq++;
@@ -1035,6 +1077,7 @@ void depthcallback(void *data, void *userdata)
       {
         sensor_msgs::Image align_image;
 
+        align_image.header.stamp = hardTimeToSoftTime(image_header.timestamp);
         align_image.header.frame_id = "feynman_camera/depthalignrgb";
         align_image.width = theparam.img_width;
         align_image.height = theparam.img_height;
@@ -1054,6 +1097,7 @@ void depthcallback(void *data, void *userdata)
         /////////////////////////////////////////////
         sensor_msgs::Image alignimage;
 
+        alignimage.header.stamp = align_image.header.stamp;
         alignimage.header.frame_id = "feynman_camera/depthalignrgbview";
         alignimage.width = theparam.img_width;
         alignimage.height = theparam.img_height;
@@ -1773,6 +1817,8 @@ int main(int argc, char *argv[])
   info->temperaturepublisher = node_obj.advertise<feynman_camera::temp_info>(tmpparamsstr, 10);
   sprintf(tmpparamsstr, "/feynman_camera/%d/imu", device_id);
   info->imupublisher = node_obj.advertise<feynman_camera::imu_info>(tmpparamsstr, 10);
+  sprintf(tmpparamsstr, "/feynman_camera/%d/imu_single", device_id);
+  info->imupublisher_single = node_obj.advertise<sensor_msgs::Imu>(tmpparamsstr, 10);
 
   sprintf(tmpparamsstr, "/feynman_camera/%d/depth/dotcloud", device_id);
   info->dotcloudpublisher = node_obj.advertise<sensor_msgs::PointCloud2>(tmpparamsstr, 10);
