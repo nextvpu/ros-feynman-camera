@@ -9,7 +9,7 @@
 #endif
 
 #include "ring_queue.h"
-#include "libusb.h"
+#include <libusb.h>
 
 #include <stdlib.h>
 #pragma pack(1)
