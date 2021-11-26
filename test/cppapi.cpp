@@ -6,9 +6,11 @@
 #include <iostream>
 using namespace std;
 
+DeviceList Feynman::g_devlist;
+
 DeviceList::DeviceList()
+: total(0)
 {
-	total = 0;
 }
 
 DeviceInfo *DeviceList::Find(unsigned int devid)
@@ -43,15 +45,18 @@ void refresh_callback(const char *devname, void *userdata)
 	devlist->Add(deviceid, devname);
 }
 
-void Feynman::EnumDevices(DeviceList *devlist, int timeout)
+int Feynman::EnumDevices(int timeout, DeviceList* devlist)
 {
+	if (devlist == nullptr)
+		devlist = &g_devlist;
 	while (timeout--)
 	{
 		feynman_refresh(refresh_callback, devlist);
 		if (devlist->total > 0)
-			return;
+			return devlist->total;
 		usleep(1000 * 1000);
 	}
+	return devlist->total;
 }
 
 Feynman::Feynman()
@@ -96,6 +101,15 @@ void other_callback(void *data, void *userdata)
 
 void Feynman::Connect(const char *devname)
 {
+	if (devname == nullptr)
+	{
+		if (g_devlist.total == 0)
+		{
+			if (EnumDevices(5) == 0)
+				return;
+		}
+		devname = g_devlist.devices[0].name;
+	}
 	feynman_connectcamera(devname,
 						  imu_callback,
 						  save_callback,

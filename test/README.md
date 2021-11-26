@@ -13,3 +13,13 @@ make
 ./apitest
 ```
 
+## Command line options
+
+```bash
+./apitest --gtest_filter=*.EnumDevices
+export GTEST_FILTER=*
+./apitest --gtest_list_tests
+export GTEST_FILTER=*.Callback
+./apitest --gtest_list_tests
+```
+

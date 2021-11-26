@@ -4,28 +4,22 @@
 #include <iostream>
 using namespace std;
 
-static DeviceList DevList;
-
 TEST(FeynmanTest, EnumDevice) {
 	Feynman f;
-    f.EnumDevices(&DevList, 15);
-    ASSERT_GE(DevList.total, 1);
+    int devices = f.EnumDevices(10);
+    ASSERT_GE(devices, 1);
 }
 
 TEST(FeynmanTest, Connect) {
 	Feynman f;
-    ASSERT_GE(DevList.total, 1);
-    const char* devname = DevList.devices[0].name;
-    f.Connect(devname);
+    f.Connect();
     bool connected = f.IsConnected();
     EXPECT_TRUE(connected);
 }
 
 TEST(FeynmanTest, Disconnect) {
 	Feynman f;
-    ASSERT_GE(DevList.total, 1);
-    const char* devname = DevList.devices[0].name;
-    f.Connect(devname);
+    f.Connect();
     bool connected = f.IsConnected();
     EXPECT_TRUE(connected);
     f.Disconnect();
@@ -35,10 +29,8 @@ TEST(FeynmanTest, Disconnect) {
 
 TEST(FeynmanTest, Callback) {
 	Feynman f;
-    ASSERT_GE(DevList.total, 1);
-    const char* devname = DevList.devices[0].name;
-    f.Connect(devname);
-	usleep(1000000 * 20);
+    f.Connect();
+	usleep(1000000 * 10);
     f.Disconnect();
     bool connected = f.IsConnected();
     EXPECT_FALSE(connected);

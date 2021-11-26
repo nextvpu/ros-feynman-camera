@@ -26,13 +26,14 @@ public:
 class Feynman
 {
 public:
-	static void EnumDevices(DeviceList* devlist, int timeout=10);
+	static int EnumDevices(int timeout=10, DeviceList* devlist=nullptr);
+	static DeviceList g_devlist;
 
 public:
 	Feynman();
 	~Feynman();
 
-	void Connect(const char* devname);
+	void Connect(const char* devname=nullptr);
 	void Disconnect();
 	bool IsConnected();
 };
