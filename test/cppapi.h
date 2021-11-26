@@ -33,7 +33,7 @@ public:
 	Feynman();
 	~Feynman();
 
-	void Connect(const char* devname=nullptr);
+	bool Connect(const char* devname=nullptr);
 	void Disconnect();
 	bool IsConnected();
 };

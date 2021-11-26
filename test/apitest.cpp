@@ -12,14 +12,16 @@ TEST(FeynmanTest, EnumDevice) {
 
 TEST(FeynmanTest, Connect) {
 	Feynman f;
-    f.Connect();
+    bool ok = f.Connect();
+    EXPECT_TRUE(ok);
     bool connected = f.IsConnected();
     EXPECT_TRUE(connected);
 }
 
 TEST(FeynmanTest, Disconnect) {
 	Feynman f;
-    f.Connect();
+    bool ok = f.Connect();
+    EXPECT_TRUE(ok);
     bool connected = f.IsConnected();
     EXPECT_TRUE(connected);
     f.Disconnect();
@@ -29,7 +31,8 @@ TEST(FeynmanTest, Disconnect) {
 
 TEST(FeynmanTest, Callback) {
 	Feynman f;
-    f.Connect();
+    bool ok = f.Connect();
+    EXPECT_TRUE(ok);
 	usleep(1000000 * 10);
     f.Disconnect();
     bool connected = f.IsConnected();

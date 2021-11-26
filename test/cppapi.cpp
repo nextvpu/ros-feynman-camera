@@ -9,7 +9,7 @@ using namespace std;
 DeviceList Feynman::g_devlist;
 
 DeviceList::DeviceList()
-: total(0)
+: total(-1)
 {
 }
 
@@ -49,6 +49,7 @@ int Feynman::EnumDevices(int timeout, DeviceList* devlist)
 {
 	if (devlist == nullptr)
 		devlist = &g_devlist;
+	devlist->total = 0;
 	while (timeout--)
 	{
 		feynman_refresh(refresh_callback, devlist);
@@ -99,18 +100,19 @@ void other_callback(void *data, void *userdata)
 	cout << "other_callback" << endl;
 }
 
-void Feynman::Connect(const char *devname)
+bool Feynman::Connect(const char *devname)
 {
 	if (devname == nullptr)
 	{
-		if (g_devlist.total == 0)
+		if (g_devlist.total < 0)
 		{
-			if (EnumDevices(5) == 0)
-				return;
+			EnumDevices(5);
 		}
+		if (g_devlist.total == 0)
+			return false;
 		devname = g_devlist.devices[0].name;
 	}
-	feynman_connectcamera(devname,
+	return feynman_connectcamera(devname,
 						  imu_callback,
 						  save_callback,
 						  depth_callback,
