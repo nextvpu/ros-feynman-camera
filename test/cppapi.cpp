@@ -11,24 +11,24 @@ DeviceList::DeviceList()
 	total = 0;
 }
 
-DeviceInfo* DeviceList::Find(unsigned int devid)
+DeviceInfo *DeviceList::Find(unsigned int devid)
 {
-  for (int i = 0; i < total; i++)
-  {
-	  DeviceInfo& di = devices[i];
-	  if (di.id == devid)
-		  return &di;
-  }
-  return nullptr;
+	for (int i = 0; i < total; i++)
+	{
+		DeviceInfo &di = devices[i];
+		if (di.id == devid)
+			return &di;
+	}
+	return nullptr;
 }
 
-bool DeviceList::Add(unsigned int devid, const char* devname)
+bool DeviceList::Add(unsigned int devid, const char *devname)
 {
 	if (Find(devid))
-	    return true;
+		return true;
 	if (total == MAX_DEVICES)
-	    return false;
-	DeviceInfo& di = devices[total++];
+		return false;
+	DeviceInfo &di = devices[total++];
 	di.id = devid;
 	strcpy(di.name, devname);
 	return true;
@@ -36,34 +36,32 @@ bool DeviceList::Add(unsigned int devid, const char* devname)
 
 void refresh_callback(const char *devname, void *userdata)
 {
-    DeviceList *devlist = (DeviceList *)userdata;
-    char *tmp = strdup(devname);
-    int deviceid = feynman_connectcameraforid(tmp);
-    free(tmp);
-    if (deviceid == 0xffffffff)
-        return;
-    devlist->Add(deviceid, devname);
+	DeviceList *devlist = (DeviceList *)userdata;
+	int deviceid = feynman_connectcameraforid(devname);
+	if (deviceid == 0xffffffff)
+		return;
+	devlist->Add(deviceid, devname);
 }
 
-void Feynman::EnumDevices(DeviceList* devlist, int timeout)
+void Feynman::EnumDevices(DeviceList *devlist, int timeout)
 {
-    while (timeout--)
-    {
-        feynman_refresh(refresh_callback, devlist);
-	    if (devlist->total > 0)
-	   	    return;
-        usleep(1000 * 1000);
-    }
+	while (timeout--)
+	{
+		feynman_refresh(refresh_callback, devlist);
+		if (devlist->total > 0)
+			return;
+		usleep(1000 * 1000);
+	}
 }
 
 Feynman::Feynman()
 {
-    feynman_init();
+	feynman_init();
 }
 
 Feynman::~Feynman()
 {
-    feynman_deinit();
+	feynman_deinit();
 }
 
 void imu_callback(void *data, void *userdata)
@@ -96,26 +94,25 @@ void other_callback(void *data, void *userdata)
 	cout << "other_callback" << endl;
 }
 
-void Feynman::Connect(const char* devname)
+void Feynman::Connect(const char *devname)
 {
-    feynman_connectcamera(devname,
-	    imu_callback,
-	    save_callback,
-	    depth_callback,
-	    ir_callback,
-	    rgb_callback,
-	    other_callback,
-	    this);
+	feynman_connectcamera(devname,
+						  imu_callback,
+						  save_callback,
+						  depth_callback,
+						  ir_callback,
+						  rgb_callback,
+						  other_callback,
+						  this);
 }
 
 void Feynman::Disconnect()
 {
 	feynman_disconnectcamera();
-    feynman_waitfordisconnect();
+	feynman_waitfordisconnect();
 }
 
 bool Feynman::IsConnected()
 {
-    return feynman_hasconnect();
+	return feynman_hasconnect();
 }
-

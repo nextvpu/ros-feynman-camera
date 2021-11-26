@@ -121,18 +121,19 @@ int32_t removeDarkOutliers(
   return 0;
 }
 
-ros::Time hardTimeToSoftTime(NVP_U64 hard_time) {
+ros::Time hardTimeToSoftTime(NVP_U64 hard_time)
+{
   static ros::Time soft_time_begin(ros::Time::now());
-  static NVP_U64 hard_time_begin(hard_time*1000);
-  NVP_U64 time_nsec = hard_time*1000 - hard_time_begin + soft_time_begin.toNSec();
-  ros::Time time ;
+  static NVP_U64 hard_time_begin(hard_time * 1000);
+  NVP_U64 time_nsec = hard_time * 1000 - hard_time_begin + soft_time_begin.toNSec();
+  ros::Time time;
   time.fromNSec(time_nsec);
   return time;
 }
 
-inline double deg2rad(const double& deg)
+inline double deg2rad(const double &deg)
 {
-  return (deg*M_PI/180.0);
+  return (deg * M_PI / 180.0);
 }
 
 std::vector<s_feynman_cam_param>
@@ -600,7 +601,7 @@ void imucallback(void *data, void *userdata)
         //pub single
         sensor_msgs::Imu imu_msg;
         imu_msg.header.frame_id = "imu";
-//        imu_msg.header.stamp.fromNSec(tmpimudata->imu_data[i].timestamp*1e3);
+        //        imu_msg.header.stamp.fromNSec(tmpimudata->imu_data[i].timestamp*1e3);
         imu_msg.header.stamp = hardTimeToSoftTime(tmpimudata->imu_data[i].timestamp);
         imu_msg.angular_velocity.x = deg2rad(tmpimudata->imu_data[i].stGyroRawData.s16X);
         imu_msg.angular_velocity.y = deg2rad(tmpimudata->imu_data[i].stGyroRawData.s16Y);
@@ -665,11 +666,11 @@ void rgbcallback(void *data, void *userdata)
       //   printf("will memcpy:%d!%d\n", data_size, width * height * 3);
       memcpy(in_ptr, buffer, data_size);
       //  printf("end memcpy!\n");
-//      new_image.header.stamp = ros::Time::now();
+      //      new_image.header.stamp = ros::Time::now();
       new_image.header.stamp = hardTimeToSoftTime(image_header.timestamp);
       if (g_runconfig >= 2) // depth or cnn_demo
       {
-//        if (count++ % 8 == 0) // for calibration
+        //        if (count++ % 8 == 0) // for calibration
         info->rgbpublisher.publish(new_image);
       }
       else
@@ -875,7 +876,7 @@ void depthcallback(void *data, void *userdata)
 
       unsigned char *tmpimgdata = tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER);
       memcpy(in_ptr, tmpimgdata, data_size);
-//      new_image->header.stamp = ros::Time::now();
+      //      new_image->header.stamp = ros::Time::now();
       new_image->header.stamp = hardTimeToSoftTime(image_header.timestamp);
       static uint32_t depthseq = 0;
       new_image->header.seq = depthseq;
@@ -1612,9 +1613,9 @@ void callback(const char *devicename, void *userdata)
 {
   DEVICEINFO *tmpdev = (DEVICEINFO *)userdata;
   ROS_INFO("will connect to device:%s\n", devicename);
-  char *tmpdevicename = strdup(devicename);
-  int tmpid = feynman_connectcameraforid(tmpdevicename);
-  free(tmpdevicename);
+
+  int tmpid = feynman_connectcameraforid(devicename);
+
   if (tmpid != 0xffffffff)
   {
     DEVICEINFO *thedev = (DEVICEINFO *)userdata;

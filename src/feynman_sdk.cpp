@@ -1475,25 +1475,30 @@ static pthread_t recvthread, depththread, rgbthread, imuthread, irthread, saveth
 #endif
 void feynman_waitfordisconnect()
 {
-	pthread_join(recvthread, NULL);
-	pthread_join(irthread, NULL);
-	pthread_join(rgbthread, NULL);
-	pthread_join(imuthread, NULL);
-	pthread_join(depththread, NULL);
-	pthread_join(savethread, NULL);
-	pthread_join(sendthread, NULL);
+	if (s_hasconnect)
+	{
+		pthread_join(recvthread, NULL);
+		pthread_join(irthread, NULL);
+		pthread_join(rgbthread, NULL);
+		pthread_join(imuthread, NULL);
+		pthread_join(depththread, NULL);
+		pthread_join(savethread, NULL);
+		pthread_join(sendthread, NULL);
 
-	s_hasconnect = FALSE;
-	g_thread_running_flag = 0;
+		s_hasconnect = FALSE;
+	}
+	else
+	{
+		printf("feynman not connected,so waitfordisconnect return instantly!\n");
+	}
 }
 
 void feynman_disconnectcamera()
 {
 	if (feynman_hasconnect())
 	{
-		s_hasconnect = FALSE;
 		g_thread_running_flag = 0;
-#ifdef _WINDOWS
+		/*#ifdef _WINDOWS
 		DWORD retfirst = WaitForSingleObject(recvthread, INFINITE);
 		DWORD retsecond = WaitForSingleObject(processthread, INFINITE);
 		DWORD retthird = WaitForSingleObject(sendthread, INFINITE);
@@ -1507,6 +1512,11 @@ void feynman_disconnectcamera()
 		pthread_join(savethread, NULL);
 		pthread_join(sendthread, NULL);
 #endif
+*/
+	}
+	else
+	{
+		printf("feynman not connected,so disconnectcamera has no effect!\n");
 	}
 }
 BOOL feynman_hasconnect()
@@ -1548,7 +1558,7 @@ unsigned int feynman_connectcameraforid(const char *devicename)
 	int bus, device;
 	char *split_buf[512] = {0};
 	int i = 0;
-	c_split((char *)devicename, "-", 512, split_buf, &num);
+	c_split((char *)msg, "-", 512, split_buf, &num);
 	if (num < 3)
 	{
 		printf("fail to split devicename!\n");
@@ -1647,6 +1657,11 @@ BOOL feynman_connectcamera(const char *devicename,
 						   FRAMECALLBACK othercallback, //cnn and log and other
 						   void *userdata)
 {
+	if (feynman_hasconnect())
+	{
+		printf("already connected,please disconnect camera first!");
+		return FALSE;
+	}
 	int ret = -1;
 	//pthread_t pid;
 	//pthread_t pid_upacket;
@@ -1657,8 +1672,8 @@ BOOL feynman_connectcamera(const char *devicename,
 	int bus, device;
 	char *split_buf[512] = {0};
 	int i = 0;
-	printf("will split devicename!%s\n", devicename);
-	c_split((char *)devicename, "-", 512, split_buf, &num);
+	printf("will split devicename!%s\n", msg);
+	c_split((char *)msg, "-", 512, split_buf, &num);
 	if (num < 3)
 	{
 		printf("fail to split devicename!%s\n", devicename);

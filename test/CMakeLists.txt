@@ -12,6 +12,7 @@ set(MY_PROJECT_SRC
 
 add_executable(apitest ${MY_PROJECT_SRC} cppapi.cpp apitest.cpp)
 
+SET(CMAKE_CXX_FLAGS "-p -g")
 target_link_libraries(apitest
     ${GTEST_BOTH_LIBRARIES}
     pthread

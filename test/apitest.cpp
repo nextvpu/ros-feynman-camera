@@ -8,7 +8,7 @@ static DeviceList DevList;
 
 TEST(FeynmanTest, EnumDevice) {
 	Feynman f;
-    f.EnumDevices(&DevList, 5);
+    f.EnumDevices(&DevList, 15);
     ASSERT_GE(DevList.total, 1);
 }
 
