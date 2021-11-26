@@ -8,6 +8,20 @@ using namespace std;
 
 DeviceList Feynman::g_devlist;
 
+ostream& operator<<(ostream& os, const DeviceInfo& di)
+{
+	os << "ID: " << di.id << "; Name: " << di.name << endl;
+	return os;
+}
+
+ostream& operator<<(ostream& os, const DeviceList& dl)
+{
+	os << "Total Devices: " << dl.total << endl;
+	for (int i = 0; i < dl.total; i++)
+		os << dl.devices[i];
+	return os;
+}
+
 DeviceList::DeviceList()
 : total(-1)
 {
@@ -54,7 +68,9 @@ int Feynman::EnumDevices(int timeout, DeviceList* devlist)
 	{
 		feynman_refresh(refresh_callback, devlist);
 		if (devlist->total > 0)
+		{
 			return devlist->total;
+		}
 		usleep(1000 * 1000);
 	}
 	return devlist->total;
@@ -63,6 +79,7 @@ int Feynman::EnumDevices(int timeout, DeviceList* devlist)
 Feynman::Feynman()
 {
 	feynman_init();
+	ResetCounters();
 }
 
 Feynman::~Feynman()
@@ -72,32 +89,32 @@ Feynman::~Feynman()
 
 void imu_callback(void *data, void *userdata)
 {
-	cout << "imu_callback" << endl;
+	((Feynman*)userdata)->CallbackIMU(data);
 }
 
 void save_callback(void *data, void *userdata)
 {
-	cout << "save_callback" << endl;
+	((Feynman*)userdata)->CallbackSave(data);
 }
 
 void depth_callback(void *data, void *userdata)
 {
-	cout << "depth_callback" << endl;
+	((Feynman*)userdata)->CallbackDepth(data);
 }
 
 void ir_callback(void *data, void *userdata)
 {
-	cout << "ir_callback" << endl;
+	((Feynman*)userdata)->CallbackIR(data);
 }
 
 void rgb_callback(void *data, void *userdata)
 {
-	cout << "rgb_callback" << endl;
+	((Feynman*)userdata)->CallbackRGB(data);
 }
 
 void other_callback(void *data, void *userdata)
 {
-	cout << "other_callback" << endl;
+	((Feynman*)userdata)->CallbackOther(data);
 }
 
 bool Feynman::Connect(const char *devname)
@@ -109,9 +126,13 @@ bool Feynman::Connect(const char *devname)
 			EnumDevices(5);
 		}
 		if (g_devlist.total == 0)
+		{
+			cout << "No camera found!" << endl;
 			return false;
+		}
 		devname = g_devlist.devices[0].name;
 	}
+	ResetCounters();
 	return feynman_connectcamera(devname,
 						  imu_callback,
 						  save_callback,
@@ -132,3 +153,51 @@ bool Feynman::IsConnected()
 {
 	return feynman_hasconnect();
 }
+
+void Feynman::ResetCounters()
+{
+	for (int i = 0; i < MAX_COUNTERS; i++)
+		m_ccb[i] = 0;
+}
+
+void Feynman::CallbackIMU(void* data)
+{
+	m_ccb[0]++;
+}
+
+void Feynman::CallbackSave(void* data)
+{
+	m_ccb[1]++;
+}
+
+void Feynman::CallbackDepth(void* data)
+{
+	m_ccb[2]++;
+}
+
+void Feynman::CallbackIR(void* data)
+{
+	m_ccb[3]++;
+}
+
+void Feynman::CallbackRGB(void* data)
+{
+	m_ccb[4]++;
+}
+
+void Feynman::CallbackOther(void* data)
+{
+	m_ccb[5]++;
+}
+
+void Feynman::ShowCounters()
+{
+	cout << "[Counters]" << endl;
+	cout << "  IMU: " << m_ccb[0] << endl;
+	cout << " Save: " << m_ccb[1] << endl;
+	cout << "Depth: " << m_ccb[2] << endl;
+	cout << "   IR: " << m_ccb[3] << endl;
+	cout << "  RGB: " << m_ccb[4] << endl;
+	cout << "Other: " << m_ccb[5] << endl;
+}
+
