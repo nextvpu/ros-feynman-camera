@@ -1485,6 +1485,20 @@ void othercallback(void *data, void *userdata)
     feynman_getcamparam(100);
   }
 
+  static bool hasinitswitch=false;
+  if(!hasinitswitch){
+    hasinitswitch=true;
+    if(!info->pubir){
+      feynman_transferir(0);
+    }
+  if(!info->pubrgb){
+        feynman_transferrgb(0);
+      }
+  if(!info->pubdepth){
+        feynman_transferdepth(0);
+      }
+  }
+
   if (tmppack->type == FEYNMAN_USER_DATA && tmppack->sub_type == FEYNMAN_USER_DATA_TO_PC)
   {
     ROS_INFO("receive user deined data!");
