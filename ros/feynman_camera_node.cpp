@@ -907,7 +907,6 @@ void depthcallback(void *data, void *userdata)
         }
         if (info->pubdotcloud)
         {
-          pnew_dotcloud.header.frame_id = "odom";
           pcloud.width = theparam.img_width;
           pcloud.height = theparam.img_height; //此处也可以为cloud.width = 4; cloud.height = 2;
                                                 //   printf("will resize points!\n");
@@ -1064,6 +1063,7 @@ void depthcallback(void *data, void *userdata)
         mp_pcloudX = Xs.mul(mp_pcloudZ);
         mp_pcloudY = Ys.mul(mp_pcloudZ);
         pcl::toROSMsg(pcloud, pnew_dotcloud);
+	pnew_dotcloud.header.frame_id = "odom";
         info->dotcloudpublisher.publish(pnew_dotcloud);
       }
       /////////////////////////////////

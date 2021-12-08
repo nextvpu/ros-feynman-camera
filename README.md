@@ -31,7 +31,7 @@ This package supports ROS and tested in Melodic(ubuntu 18.04 lts).
 4. Pull the repository into your ROS workspace
     ```sh
     cd ~/catkin_ws/src
-    git clone https://github.com/nextvpu/ros-feynman-camera
+    git clone https://gitee.com/nextvpu/ros-feynman-camera
     ```
 
 5. cp feynman udev rule
