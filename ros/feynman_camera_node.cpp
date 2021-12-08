@@ -1036,9 +1036,9 @@ void depthcallback(void *data, void *userdata)
               if (resultu >= 0 && resultu < width && resultv >= 0 && resultv < height)
               {
                 depthrgbmask[i]=depth;
-                depthrgbmaskview[j]=color.r;
-                depthrgbmaskview[j+1]=color.g;
-                depthrgbmaskview[j+2]=color.b;
+                depthrgbmaskview[j]=color->r;
+                depthrgbmaskview[j+1]=color->g;
+                depthrgbmaskview[j+2]=color->b;
               }
               else
               {

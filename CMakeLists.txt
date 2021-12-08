@@ -76,7 +76,7 @@ catkin_package(
   
 )
 
-include_directories(include /usr/include/libusb-1.0 /usr/include/pcl-1.8 /usr/include/eigen3
+include_directories(include /usr/include/libusb-1.0 /usr/include/pcl-1.7 /usr/include/eigen3
                     ${catkin_INCLUDE_DIRS}
                     )
 
