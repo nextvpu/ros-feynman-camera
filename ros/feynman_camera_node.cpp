@@ -37,6 +37,7 @@
 #include <string.h>
 #define MAXWIDTH 1280
 #define MAXHEIGHT 800
+using namespace cv;
 
 double DEPTHMAX = 5000.0;
 double DEPTHMIN = 100.0;
@@ -75,7 +76,7 @@ void resfpscallback(feynman_camera::resfpsConfig &config)
   }
 }
 ////////////////////////////////////
-using namespace cv;
+
 unsigned char *g_leftdepth = NULL;
 
 bool g_removedark = true;
@@ -104,20 +105,14 @@ int32_t removeDarkOutliers(
                               // box filter SAD
   Mat sad;
   boxFilter(sDiff, sad, -1, Size(winsize, winsize), Point(-1, -1), true, 2);
-  // compare  mask1 mask2
-  Mat mask1, mask2;
-  mask1 = sad < sigmaThr;
-  mask2 = meanI < pixThr;
   // mask and op
-  Mat mask = mask1 & mask2;
-  Mat nmask;
-  mask.convertTo(nmask, CV_16UC1, 1, 0);
+  Mat mask = sad >= sigmaThr | meanI >= pixThr;
   // mask box filter
 
   // compare   //todo:simplify here
-  Mat ndepth;
-  depth.copyTo(ndepth, 255 - mask);
-  depth = ndepth;
+  Mat nDepth;
+  depth.copyTo(nDepth, mask);
+  memcpy(depth.data,nDepth.data,nDepth.rows*nDepth.step[0]);
   return 0;
 }
 
@@ -736,9 +731,9 @@ void calculatecolortable()
 {
   if (NULL == g_colortable)
   {
-    g_colortable = (MYRGB *)calloc(1, sizeof(MYRGB) * 65535);
+    g_colortable = (MYRGB *)calloc(1, sizeof(MYRGB) * 65536);
   }
-  memset(g_colortable, 0, sizeof(MYRGB) * 65535);
+  memset(g_colortable, 0, sizeof(MYRGB) * 65536);
 
   for (int i = (int)DEPTHMIN; i <= (int)DEPTHMAX; i++)
   { //0.2m-5m
@@ -768,6 +763,30 @@ void calculatecolortable()
     }
   }
 }
+sensor_msgs::PointCloud2 pnew_dotcloud;
+pcl::PointCloud<pcl::PointXYZ> pcloud;
+Mat Xs;
+Mat Ys;
+Mat mp_pcloud;
+Mat mp_pcloudX;
+Mat mp_pcloudY;
+Mat mp_pcloudZ;
+sensor_msgs::CameraInfo caminfo;
+sensor_msgs::Image new_image;
+sensor_msgs::Image pseudoimage;
+bool initCaminfo = false;
+float LEFTCAMERAFX = 1048.0;
+float LEFTCAMERAFY = 1048.0;
+float CAMERAT = 23.590832;
+float LEFTCAMERAX = 174.361675;
+float LEFTCAMERAY = 297.007244;
+
+float DEPTHINRGBROTATE[9];
+float DEPTHINRGBOFFSET[3];
+float RGBFX;
+float RGBFY;
+float RGBX;
+float RGBY;
 void depthcallback(void *data, void *userdata)
 {
   DEVICEINFO *info = (DEVICEINFO *)userdata;
@@ -816,34 +835,10 @@ void depthcallback(void *data, void *userdata)
 
       if (info->confidence && g_leftdepth != NULL && g_removedark && (tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER)) == width * height * 2)
       {
-        Mat tempdepth = Mat(height, width, CV_16U, Scalar::all(0));
-        // 循环赋值
-        for (int i = 0; i < height; i++)
-        {
-          for (int j = 0; j < width; j++)
-          {
-            tempdepth.at<uint16_t>(i, j) = *((uint16_t *)(tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER)) + i * width + j);
-          }
-        }
-        Mat templeftraw = Mat(height, width, CV_8U, Scalar::all(0));
-        // 循环赋值
-        for (int i = 0; i < height; i++)
-        {
-          for (int j = 0; j < width; j++)
-          {
-            templeftraw.at<uint8_t>(i, j) = *((uint8_t *)(g_leftdepth) + i * width + j);
-          }
-        }
+        Mat tempdepth = Mat(height, width, CV_16U, (uint8_t *)(tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER)));
+        Mat templeftraw = Mat(height, width, CV_8U, (uint8_t *)(g_leftdepth));
         int8_t winsize = 15;
         removeDarkOutliers(templeftraw, tempdepth, pixthreshold, sigmathreshold, winsize);
-
-        for (int i = 0; i < height; i++)
-        {
-          for (int j = 0; j < width; j++)
-          {
-            *((uint16_t *)(tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER)) + i * width + j) = tempdepth.at<uint16_t>(i, j);
-          }
-        }
       }
     }
   }
@@ -851,109 +846,132 @@ void depthcallback(void *data, void *userdata)
   if (tmppack->type == FEYNMAN_IMAGE_DATA && tmppack->sub_type == FEYNMAN_DEPTH_IMAGE)
   {
     // ROS_INFO("depth data!\n");
-
     if (g_cameraparam.size() == 1 && (tmppack->len - sizeof(FEYNMAN_USB_IMAGE_HEADER)) == g_cameraparam[0].img_width * g_cameraparam[0].img_height * 2)
     {
-
       int width = g_cameraparam[0].img_width;
       int height = g_cameraparam[0].img_height;
 
       //   printf("will depthraw publish!\n");
       s_feynman_cam_param theparam = g_cameraparam[0];
-      sensor_msgs::Image *new_image = new sensor_msgs::Image;
+      
+      if(!initCaminfo)
+      {
+        new_image.header.frame_id = "feynman_camera/depth/image_raw";
+        new_image.width = theparam.img_width;
+        new_image.height = theparam.img_height;
+        new_image.is_bigendian = 0;
+        new_image.encoding = sensor_msgs::image_encodings::TYPE_16UC1;
+        new_image.step = sizeof(unsigned short) * new_image.width;
+        new_image.data.resize(new_image.step * new_image.height);
+        if(info->pubpseudo)
+        {
+          pseudoimage.header.frame_id = "feynman_camera/depthpseudo";
+          pseudoimage.width = theparam.img_width;
+          pseudoimage.height = theparam.img_height;
+          pseudoimage.is_bigendian = 0;
+          pseudoimage.encoding = sensor_msgs::image_encodings::RGB8;
+          pseudoimage.step = 3 * pseudoimage.width;
+          int data_size = pseudoimage.step * pseudoimage.height;
+          pseudoimage.data.resize(data_size);
+        }
+        if (info->pubdepthalign || info->pubdotcloud)
+        {
+          LEFTCAMERAX = theparam.left_sensor_photocenter[0];
+          LEFTCAMERAY = theparam.left_sensor_photocenter[1];
+          LEFTCAMERAFX = theparam.left_sensor_focus[0];
+          LEFTCAMERAFY = theparam.left_sensor_focus[1];
 
-      new_image->header.frame_id = "feynman_camera/depth/image_raw";
-      new_image->width = theparam.img_width;
-      new_image->height = theparam.img_height;
-      new_image->is_bigendian = 0;
-      new_image->encoding = sensor_msgs::image_encodings::TYPE_16UC1;
-      new_image->step = sizeof(unsigned short) * new_image->width;
-
-      std::size_t data_size = new_image->step * new_image->height;
-      new_image->data.resize(data_size);
-
-      unsigned short *in_ptr = reinterpret_cast<unsigned short *>(&new_image->data[0]);
-
-      unsigned char *tmpimgdata = tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER);
-      memcpy(in_ptr, tmpimgdata, data_size);
+          memcpy(&DEPTHINRGBROTATE[0], &theparam.left2rgb_extern_param[0], 9 * sizeof(float));
+          memcpy(&DEPTHINRGBOFFSET[0], &theparam.left2rgb_extern_param[9], 3 * sizeof(float));
+          DEPTHINRGBOFFSET[0] /= 1000.0;
+          DEPTHINRGBOFFSET[1] /= 1000.0;
+          DEPTHINRGBOFFSET[2] /= 1000.0;
+          RGBFX = theparam.rgb_sensor_focus[0];
+          RGBFY = theparam.rgb_sensor_focus[1];
+          RGBX = theparam.rgb_sensor_photocenter[0];
+          RGBY = theparam.rgb_sensor_photocenter[1];
+          Xs = Mat(theparam.img_width * theparam.img_height, 1, CV_32FC1);
+          Ys = Mat(theparam.img_width * theparam.img_height, 1, CV_32FC1);
+          int i = 0;
+          float *mpX = (float *)Xs.data;
+          float *mpY = (float *)Ys.data;
+          for (int row = 0; row < theparam.img_height; row++)
+          {
+            for (int col = 0; col < theparam.img_width; col++)
+            {
+              mpX[i] = ((float)col - LEFTCAMERAX) / LEFTCAMERAFX;
+              mpY[i] = ((float)row - LEFTCAMERAY) / LEFTCAMERAFY;
+              i++;
+            }
+          }
+        }
+        if (info->pubdotcloud)
+        {
+          pnew_dotcloud.header.frame_id = "odom";
+          pcloud.width = theparam.img_width;
+          pcloud.height = theparam.img_height; //此处也可以为cloud.width = 4; cloud.height = 2;
+                                                //   printf("will resize points!\n");
+          pcloud.points.resize(pcloud.width * pcloud.height);
+          mp_pcloud = Mat(theparam.img_width * theparam.img_height, 4, CV_32FC1, &pcloud.points[0]);
+          mp_pcloudX = mp_pcloud.colRange(0, 1);
+          mp_pcloudY = mp_pcloud.colRange(1, 2);
+          mp_pcloudZ = mp_pcloud.colRange(2, 3);
+        }
+      }
+      memcpy(&new_image.data[0], tmppack->data + sizeof(FEYNMAN_USB_IMAGE_HEADER), new_image.step * new_image.height);
       //      new_image->header.stamp = ros::Time::now();
-      new_image->header.stamp = hardTimeToSoftTime(image_header.timestamp);
+      new_image.header.stamp = hardTimeToSoftTime(image_header.timestamp);
       static uint32_t depthseq = 0;
-      new_image->header.seq = depthseq;
+      new_image.header.seq = depthseq;
       depthseq++;
-      info->depthrawpublisher.publish(*new_image);
+      info->depthrawpublisher.publish(new_image);
+      if(!initCaminfo)
+      {
+        initCaminfo=true;
+        caminfo.width = theparam.img_width;
+        caminfo.height = theparam.img_height;
+        caminfo.distortion_model = sensor_msgs::distortion_models::PLUMB_BOB;
+        caminfo.D.resize(5, 0.0);
+        caminfo.D[0] = 0;
+        caminfo.D[1] = 0;
+        caminfo.D[2] = 0;
+        caminfo.D[3] = 0;
+        caminfo.D[4] = 0;
 
-      sensor_msgs::CameraInfo caminfo;
+        caminfo.K.assign(0.0);
+        caminfo.K[0] = theparam.left_sensor_focus[0];
+        caminfo.K[2] = theparam.left_sensor_photocenter[0];
+        caminfo.K[4] = theparam.left_sensor_focus[1];
+        caminfo.K[5] = theparam.left_sensor_photocenter[1];
+        caminfo.K[8] = 1.0;
 
-      caminfo.width = theparam.img_width;
-      caminfo.height = theparam.img_height;
-      caminfo.distortion_model = sensor_msgs::distortion_models::PLUMB_BOB;
-      caminfo.D.resize(5, 0.0);
-      caminfo.D[0] = 0;
-      caminfo.D[1] = 0;
-      caminfo.D[2] = 0;
-      caminfo.D[3] = 0;
-      caminfo.D[4] = 0;
+        caminfo.R.assign(0.0);
+        // for (int i = 0; i < 9; i++)
+        //{
+        //   caminfo.R[i] = p.r2l_r[i];
+        // }
+        caminfo.R[0] = 1;
+        caminfo.R[4] = 1;
+        caminfo.R[8] = 1;
 
-      caminfo.K.assign(0.0);
-      caminfo.K[0] = theparam.left_sensor_focus[0];
-      caminfo.K[2] = theparam.left_sensor_photocenter[0];
-      caminfo.K[4] = theparam.left_sensor_focus[1];
-      caminfo.K[5] = theparam.left_sensor_photocenter[1];
-      caminfo.K[8] = 1.0;
-
-      caminfo.R.assign(0.0);
-      // for (int i = 0; i < 9; i++)
-      //{
-      //   caminfo.R[i] = p.r2l_r[i];
-      // }
-      caminfo.R[0] = 1;
-      caminfo.R[4] = 1;
-      caminfo.R[8] = 1;
-
-      caminfo.P.assign(0.0);
-      caminfo.P[0] = caminfo.K[0];
-      caminfo.P[2] = caminfo.K[2];
-      caminfo.P[3] = (theparam.is_new_format ? theparam.left2right_extern_param[9] : theparam.left2right_extern_param[3]);
-      caminfo.P[5] = caminfo.K[4];
-      caminfo.P[6] = caminfo.K[5];
-      caminfo.P[7] = 0;
-      caminfo.P[10] = 1.0;
-      caminfo.P[11] = 0;
+        caminfo.P.assign(0.0);
+        caminfo.P[0] = caminfo.K[0];
+        caminfo.P[2] = caminfo.K[2];
+        caminfo.P[3] = (theparam.is_new_format ? theparam.left2right_extern_param[9] : theparam.left2right_extern_param[3]);
+        caminfo.P[5] = caminfo.K[4];
+        caminfo.P[6] = caminfo.K[5];
+        caminfo.P[7] = 0;
+        caminfo.P[10] = 1.0;
+        caminfo.P[11] = 0;
+        caminfo.header.frame_id = "feynman_camera/depth/camerainfo";
+      }
       // Fill in header
-      caminfo.header.stamp = new_image->header.stamp;
-      caminfo.header.seq = new_image->header.seq;
-      caminfo.header.frame_id = "feynman_camera/depth/camerainfo";
+      caminfo.header.stamp = new_image.header.stamp;
+      caminfo.header.seq = new_image.header.seq;
 
-      delete new_image;
       info->depthcamerainfopublisher.publish(caminfo);
 
       //     printf("will dotcloud publish!\n");
-
-      double LEFTCAMERAFX = 1048.0;
-      double LEFTCAMERAFY = 1048.0;
-      double CAMERAT = 23.590832;
-      double LEFTCAMERAX = 174.361675;
-      double LEFTCAMERAY = 297.007244;
-
-      float DEPTHINRGBROTATE[9];
-      float DEPTHINRGBOFFSET[3];
-      float RGBFX;
-      float RGBFY;
-      float RGBX;
-      float RGBY;
-      //      printf("will get some param!\n");
-      LEFTCAMERAX = theparam.left_sensor_photocenter[0];
-      LEFTCAMERAY = theparam.left_sensor_photocenter[1];
-      LEFTCAMERAFX = theparam.left_sensor_focus[0];
-      LEFTCAMERAFY = theparam.left_sensor_focus[1];
-
-      memcpy(&DEPTHINRGBROTATE[0], &theparam.left2rgb_extern_param[0], 9 * sizeof(float));
-      memcpy(&DEPTHINRGBOFFSET[0], &theparam.left2rgb_extern_param[9], 3 * sizeof(float));
-      RGBFX = theparam.rgb_sensor_focus[0];
-      RGBFY = theparam.rgb_sensor_focus[1];
-      RGBX = theparam.rgb_sensor_photocenter[0];
-      RGBY = theparam.rgb_sensor_photocenter[1];
 
       //   printf("will get camerat!\n");
       if (theparam.is_new_format == 1)
@@ -970,108 +988,83 @@ void depthcallback(void *data, void *userdata)
       // Fill in the cloud data
 
       /////////////////////////will publish dot cloud
-      sensor_msgs::PointCloud2 *pnew_dotcloud = NULL;
-
-      pcl::PointCloud<pcl::PointXYZ> *pcloud = NULL;
-
-      if (info->pubdotcloud)
-      {
-        pnew_dotcloud = new sensor_msgs::PointCloud2;
-        pcloud = new pcl::PointCloud<pcl::PointXYZ>;
-
-        pcloud->width = theparam.img_width;
-        pcloud->height = theparam.img_height; //此处也可以为cloud.width = 4; cloud.height = 2;
-                                              //   printf("will resize points!\n");
-        pcloud->points.resize(pcloud->width * pcloud->height);
-      }
-
       static uint16_t *depthrgbmask = (uint16_t *)malloc(MAXWIDTH * MAXHEIGHT * sizeof(uint16_t));
       static uint8_t *depthrgbmaskview = (uint8_t *)malloc(MAXWIDTH * MAXHEIGHT * 3);
-      static uint8_t *depthpseudo = (uint8_t *)malloc(MAXWIDTH * MAXHEIGHT * 3);
-      memset(depthrgbmask, 0, width * height * sizeof(uint16_t));
-      memset(depthrgbmaskview, 0, width * height * 3);
-      memset(depthpseudo, 0, width * height * 3);
+      //memset(depthrgbmask, 0, width * height * sizeof(uint16_t));
+      //memset(depthrgbmaskview, 0, width * height * 3);
+      //memset(depthpseudo, 0, width * height * 3);
       // printf("will convert dotclould!\n");
-      if (info->pubdepthalign || info->pubpseudo || info->pubdotcloud)
+      if (info->pubpseudo || info->pubdotcloud ||info->pubdepthalign)
       {
-        for (int row = 0; row < height; row++)
+        MYRGB* color;
+        int len = height * width;
+        uint8_t *depthpseudo=(uint8_t *)(&pseudoimage.data[0]);
+        for (int i = 0, j = 0,k=0; i < len; i++,j+=3)
         {
-          for (int col = 0; col < width; col++)
+          uint16_t depth = tmppic[i];
+          float Z=float(depth)/1000.0f;
+          color = g_colortable+depth;
+          if(info->pubpseudo)
           {
-            int index = row * width + col;
-            uint16_t depth = *(tmppic + row * width + col);
-            MYRGB color;
-            color.r = 0;
-            color.g = 0;
-            color.b = 0;
-            if (depth >= DEPTHMIN && depth <= DEPTHMAX)
+            depthpseudo[j]=color->r;
+            depthpseudo[j+1]=color->g;
+            depthpseudo[j+2]=color->b;
+            //memcpy(depthpseudo + j, color, 3);
+          }
+          if(info->pubdotcloud)
+          {
+            float* mpZ = (float*) mp_pcloudZ.data;
+            mpZ[k]=Z;
+            k+=4;
+          }
+          if (info->pubdepthalign)
+          {
+            float* mpX = (float*) Xs.data;
+            float* mpY = (float*) Ys.data;
+            float X=mpX[i]*Z;
+            float Y=mpY[i]*Z;
+            float rgbx = DEPTHINRGBROTATE[0] * X + DEPTHINRGBROTATE[1] * Y + DEPTHINRGBROTATE[2] * Z + DEPTHINRGBOFFSET[0];
+            float rgby = DEPTHINRGBROTATE[3] * X + DEPTHINRGBROTATE[4] * Y + DEPTHINRGBROTATE[5] * Z + DEPTHINRGBOFFSET[1];
+            float rgbz = DEPTHINRGBROTATE[6] * X + DEPTHINRGBROTATE[7] * Y + DEPTHINRGBROTATE[8] * Z + DEPTHINRGBOFFSET[2];
+            /////////////////rgbdotcloud->rgb
+            if (rgbz > 0.0001)
             {
-              color = *(g_colortable + depth);
-              if (info->pubpseudo)
+              float tmpx = rgbx / rgbz, tmpy = rgby / rgbz;
+              int resultu = (int)(tmpx * RGBFX + RGBX + 0.5);
+              int resultv = (int)(tmpy * RGBFY + RGBY + 0.5);
+              //	printf("resultuv:%d,%d\n", resultu, resultv);
+              if (resultu >= 0 && resultu < width && resultv >= 0 && resultv < height)
               {
-                *(depthpseudo + (row * width + col) * 3) = color.r;
-                *(depthpseudo + (row * width + col) * 3 + 1) = color.g;
-                *(depthpseudo + (row * width + col) * 3 + 2) = color.b;
+                depthrgbmask[i]=depth;
+                depthrgbmaskview[j]=color.r;
+                depthrgbmaskview[j+1]=color.g;
+                depthrgbmaskview[j+2]=color.b;
+              }
+              else
+              {
+                depthrgbmask[i]=0;
+                depthrgbmaskview[j]=0;
+                depthrgbmaskview[j+1]=0;
+                depthrgbmaskview[j+2]=0;
               }
             }
             else
             {
-              if (info->pubpseudo)
-              {
-                *(depthpseudo + (row * width + col) * 3) = 0;
-                *(depthpseudo + (row * width + col) * 3 + 1) = 0;
-                *(depthpseudo + (row * width + col) * 3 + 2) = 0;
-              }
+              depthrgbmask[i]=0;
+              depthrgbmaskview[j]=0;
+              depthrgbmaskview[j+1]=0;
+              depthrgbmaskview[j+2]=0;
             }
-
-            double X = ((double)col - LEFTCAMERAX) * (double)depth / LEFTCAMERAFX;
-            double Y = ((double)row - LEFTCAMERAY) * (double)depth / LEFTCAMERAFY;
-            double Z = (double)depth;
-            if (info->pubdotcloud)
-            {
-              pcloud->points[index].x = X / 1000.0;
-              pcloud->points[index].y = Y / 1000.0;
-              pcloud->points[index].z = Z / 1000.0;
-            }
-            ////////////////////////////////////////////////
-            /////////////////��ʼ��depthdotcloud->rgbdotcloud
-            if (depth > 0 && info->pubdepthalign)
-            {
-              float rgbx = (DEPTHINRGBROTATE[0] * X + DEPTHINRGBROTATE[1] * Y + DEPTHINRGBROTATE[2] * Z + DEPTHINRGBOFFSET[0]) / 1000.0;
-              float rgby = (DEPTHINRGBROTATE[3] * X + DEPTHINRGBROTATE[4] * Y + DEPTHINRGBROTATE[5] * Z + DEPTHINRGBOFFSET[1]) / 1000.0;
-              float rgbz = (DEPTHINRGBROTATE[6] * X + DEPTHINRGBROTATE[7] * Y + DEPTHINRGBROTATE[8] * Z + DEPTHINRGBOFFSET[2]) / 1000.0;
-              /////////////////rgbdotcloud->rgb
-              if (rgbz > 0.0001)
-              {
-                float tmpx = rgbx / rgbz, tmpy = rgby / rgbz;
-
-                int resultu = (int)(tmpx * RGBFX + RGBX + 0.5);
-                int resultv = (int)(tmpy * RGBFY + RGBY + 0.5);
-                //	printf("resultuv:%d,%d\n", resultu, resultv);
-                if (resultu >= 0 && resultu < width && resultv >= 0 && resultv < height)
-                {
-                  *(depthrgbmask + (resultv * width + resultu)) = depth;
-                  *(depthrgbmaskview + (resultv * width + resultu) * 3) = color.r;
-                  *(depthrgbmaskview + (resultv * width + resultu) * 3 + 1) = color.g;
-                  *(depthrgbmaskview + (resultv * width + resultu) * 3 + 2) = color.b;
-                }
-              }
-            }
-          }
+          } 
         }
+        
       }
-      if (info->pubdotcloud)
+      if(info->pubdotcloud)
       {
-        // printf("after convert dotclould!\n");
-        // Convert the cloud to ROS message
-        pcl::toROSMsg(*pcloud, *pnew_dotcloud);
-
-        // printf("after torosmsg!\n");
-        pnew_dotcloud->header.frame_id = "odom";
-
-        info->dotcloudpublisher.publish(*pnew_dotcloud);
-        delete pnew_dotcloud;
-        delete pcloud;
+        mp_pcloudX = Xs.mul(mp_pcloudZ);
+        mp_pcloudY = Ys.mul(mp_pcloudZ);
+        pcl::toROSMsg(pcloud, pnew_dotcloud);
+        info->dotcloudpublisher.publish(pnew_dotcloud);
       }
       /////////////////////////////////
       if (info->pubdepthalign)
@@ -1086,10 +1079,10 @@ void depthcallback(void *data, void *userdata)
         align_image.encoding = sensor_msgs::image_encodings::TYPE_16UC1;
         align_image.step = sizeof(unsigned short) * align_image.width;
 
-        data_size = align_image.step * align_image.height;
+        int data_size = align_image.step * align_image.height;
         align_image.data.resize(data_size);
 
-        in_ptr = reinterpret_cast<unsigned short *>(&align_image.data[0]);
+        unsigned short *in_ptr = reinterpret_cast<unsigned short *>(&align_image.data[0]);
 
         memcpy(in_ptr, depthrgbmask, data_size);
 
@@ -1121,25 +1114,6 @@ void depthcallback(void *data, void *userdata)
 
       if (info->pubpseudo)
       {
-        sensor_msgs::Image pseudoimage;
-
-        pseudoimage.header.frame_id = "feynman_camera/depthpseudo";
-        pseudoimage.width = theparam.img_width;
-        pseudoimage.height = theparam.img_height;
-        pseudoimage.is_bigendian = 0;
-        pseudoimage.encoding = sensor_msgs::image_encodings::RGB8;
-        pseudoimage.step = 3 * pseudoimage.width;
-
-        data_size = pseudoimage.step * pseudoimage.height;
-        pseudoimage.data.resize(data_size);
-
-        width = pseudoimage.width;
-        height = pseudoimage.height;
-        //   printf("ok convert nv12 to rgb24!\n");
-        unsigned char *inpseudo_ptr = reinterpret_cast<unsigned char *>(&pseudoimage.data[0]);
-        //   printf("will memcpy:%d!%d\n", data_size, width * height * 3);
-        memcpy(inpseudo_ptr, depthpseudo, data_size);
-        //  printf("end memcpy!\n");
         info->depthpseudopublisher.publish(pseudoimage);
       }
     }
