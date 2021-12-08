@@ -75,10 +75,16 @@ catkin_package(
   CATKIN_DEPENDS rospy std_msgs camera_info_manager dynamic_reconfigure  sensor_msgs roscpp message_runtime
   
 )
+EXEC_PROGRAM("grep VERSION_ID -r /etc/os-release |awk -F = '{print $2}'" OUTPUT_VARIABLE DISTRIB_VERSION_ID RETURN_VALUE LS_RVALUE)
 
-include_directories(include /usr/include/libusb-1.0 /usr/include/pcl-1.7 /usr/include/eigen3
-                    ${catkin_INCLUDE_DIRS}
-                    )
+message(STATUS "VERSION : ${DISTRIB_VERSION_ID}")
+      IF ( ${DISTRIB_VERSION_ID} MATCHES "16.04" )
+      set(PCLPATH  "/usr/include/pcl-1.7")
+      ELSEIF ( ${DISTRIB_VERSION_ID} MATCHES "18.04"  )
+      set(PCLPATH  "/usr/include/pcl-1.8")
+      ELSEIF (${DISTRIB_VERSION_ID} MATCHES "20.04"   )
+      set(PCLPATH  "/usr/include/pcl-1.10")
+      ENDIF ()
 
 add_executable(feynman_camera
    ros/feynman_camera_node.cpp
@@ -97,6 +103,9 @@ add_dependencies(feynman_camera ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXP
 #pragma comment(lib,"ittnotifyd.lib")
 #pragma comment(lib,"zlibd.lib")
 
+include_directories(include /usr/include/libusb-1.0 ${PCLPATH} /usr/include/eigen3
+${catkin_INCLUDE_DIRS}
+)
 target_link_libraries(feynman_camera ${catkin_LIBRARIES} usb-1.0 opencv_core opencv_imgproc)
 add_dependencies(feynman_camera ${PROJECT_NAME}_generate_messages_cpp)
 
