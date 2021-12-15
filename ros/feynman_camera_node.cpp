@@ -1625,7 +1625,7 @@ void *devicethread(void *param)
     while (info->connected == 0)
     {
       ROS_INFO("will refresh usb device!\n");
-      usleep(1000 * 1000);
+      sleep(1);
       feynman_refresh(callback, info);
     }
     ROS_INFO("device:%d connected!\n", info->device_id);
@@ -1643,16 +1643,12 @@ void *devicethread(void *param)
   }
   return 0;
 }
+
 int main(int argc, char *argv[])
 {
   ROS_INFO("enter main func!\n");
   ros::init(argc, argv, "feynman_camera");
   ros::NodeHandle node_obj;
-
-  dynamic_reconfigure::Server<feynman_camera::resfpsConfig> dynamicresfpsserver;
-  dynamic_reconfigure::Server<feynman_camera::resfpsConfig>::CallbackType f;
-  f = boost::bind(&resfpscallback, _1); //绑定回调函数
-  dynamicresfpsserver.setCallback(f);   //为服务器设置回调函数， 节点程序运行时会调用一次回调函数来输出当前的参数配置情况
 
   ROS_INFO("will get device_id from launch!\n");
   int device_id = 305419896;
@@ -1661,74 +1657,145 @@ int main(int argc, char *argv[])
 
   DEVICEINFO *info = (DEVICEINFO *)calloc(1, sizeof(DEVICEINFO));
 
-  if (!ros::param::get("/feynmannode/pubrgb", info->pubrgb))
+  int trytimes=0;
+  while (!ros::param::get("/feynmannode/pubrgb", info->pubrgb))
   {
+    if(trytimes>10){
+	   printf("try 10 times,failed,exit...!\n");
+	  exit(0);
+    } 
+    trytimes++; 
     printf("fail to get pubrgb from param!");
-    exit(0);
+    sleep(1);
   }
-  if (!ros::param::get("/feynmannode/pubir", info->pubir))
+  trytimes=0;
+  while (!ros::param::get("/feynmannode/pubir", info->pubir))
   {
+    if(trytimes>10){
+	   printf("try 10 times,failed,exit...!\n");
+	  exit(0);
+    } 
+    trytimes++; 
     printf("fail to get pubir from param!");
-    exit(0);
+    sleep(1);
   }
-  if (!ros::param::get("/feynmannode/pubdepth", info->pubdepth))
+  trytimes=0;
+  while (!ros::param::get("/feynmannode/pubdepth", info->pubdepth))
   {
+    if(trytimes>10){
+	   printf("try 10 times,failed,exit...!\n");
+	  exit(0);
+    } 
+    trytimes++; 
     printf("fail to get pubdepth from param!");
-    exit(0);
+    sleep(1);
   }
-  if (!ros::param::get("/feynmannode/savedata", info->savedata))
+  trytimes=0;
+  while (!ros::param::get("/feynmannode/savedata", info->savedata))
   {
+    if(trytimes>10){
+	   printf("try 10 times,failed,exit...!\n");
+	  exit(0);
+    } 
+    trytimes++; 
     printf("fail to get savedata from param!");
-    exit(0);
+    sleep(1);
   }
-  if (!ros::param::get("/feynmannode/pubdepthalign", info->pubdepthalign))
+  trytimes=0;
+  while(!ros::param::get("/feynmannode/pubdepthalign", info->pubdepthalign))
   {
+    if(trytimes>10){
+	   printf("try 10 times,failed,exit...!\n");
+	  exit(0);
+    } 
+    trytimes++; 
     printf("fail to get pubdepthalign from param!");
-    exit(0);
+    sleep(1);
   }
-  if (!ros::param::get("/feynmannode/pubdotcloud", info->pubdotcloud))
+  trytimes=0;
+  while(!ros::param::get("/feynmannode/pubdotcloud", info->pubdotcloud))
   {
+    if(trytimes>10){
+	   printf("try 10 times,failed,exit...!\n");
+	  exit(0);
+    } 
+    trytimes++; 
     printf("fail to get pubdotcloud from param!");
-    exit(0);
+    sleep(1);
   }
 
-  if (!ros::param::get("/feynmannode/confidence", info->confidence))
+  trytimes=0;
+  while(!ros::param::get("/feynmannode/confidence", info->confidence))
   {
+    if(trytimes>10){
+	   printf("try 10 times,failed,exit...!\n");
+	  exit(0);
+    } 
+    trytimes++; 
     printf("fail to get confidence from param!");
-    exit(0);
+    sleep(1);
   }
 
-  if (!ros::param::get("/feynmannode/pubpseudo", info->pubpseudo))
+  trytimes=0;
+  while(!ros::param::get("/feynmannode/pubpseudo", info->pubpseudo))
   {
+    if(trytimes>10){
+	   printf("try 10 times,failed,exit...!\n");
+	  exit(0);
+    } 
+    trytimes++; 
     printf("fail to get pubpseudo from param!");
-    exit(0);
+    sleep(1);
   }
 
-  if (!ros::param::get("/feynmannode/pubimu", info->pubimu))
+  trytimes=0;
+  while(!ros::param::get("/feynmannode/pubimu", info->pubimu))
   {
+    if(trytimes>10){
+	   printf("try 10 times,failed,exit...!\n");
+	  exit(0);
+    } 
+    trytimes++; 
     printf("fail to get pubimu from param!");
-    exit(0);
+    sleep(1);
   }
 
-  if (!ros::param::get("/feynmannode/device_id", device_id))
+  trytimes=0;
+  while(!ros::param::get("/feynmannode/device_id", device_id))
   {
+    if(trytimes>10){
+	   printf("try 10 times,failed,exit...!\n");
+	  exit(0);
+    } 
+    trytimes++; 
     printf("fail to get device id from param!\n");
-    exit(0);
+    sleep(1);
   }
   //  usleep(10*1000*1000);
   ROS_INFO("got device_id:%d from launch!\n", device_id);
+  trytimes=0;
 
-  if (!ros::param::get("/feynmannode/resolution", resolutionstr))
+  while(!ros::param::get("/feynmannode/resolution", resolutionstr))
   {
+    if(trytimes>10){
+	   printf("try 10 times,failed,exit...!\n");
+	  exit(0);
+    } 
+    trytimes++; 
     printf("fail to get resolution from param!\n");
-    exit(0);
+    sleep(1);
   }
   ROS_INFO("got resolution:%s from launch!\n", resolutionstr.c_str());
-
-  if (!ros::param::get("/feynmannode/fps", fps))
+  trytimes=0;
+  while(!ros::param::get("/feynmannode/fps", fps))
   {
+    if(trytimes>10){
+	   printf("try 10 times,failed,exit...!\n");
+	  exit(0);
+    } 
+    trytimes++; 
     printf("fail to get fps from param!");
-    exit(0);
+    sleep(1);
   }
 
   ROS_INFO("got fps:%d from launch!\n", fps);
@@ -1847,6 +1914,14 @@ int main(int argc, char *argv[])
 
   pthread_t devicethreadid;
   pthread_create(&devicethreadid, NULL, devicethread, info);
+
+  dynamic_reconfigure::Server<feynman_camera::resfpsConfig> dynamicresfpsserver;
+  dynamic_reconfigure::Server<feynman_camera::resfpsConfig>::CallbackType f;
+  f = boost::bind(&resfpscallback, _1); //绑定回调函数
+  dynamicresfpsserver.setCallback(f);   //为服务器设置回调函数， 节点程序运行时会调用一次回调函数来输出当前的参数配置情况
+
+
+
   // getchar();
   ros::spin();
   feynman_deinit();

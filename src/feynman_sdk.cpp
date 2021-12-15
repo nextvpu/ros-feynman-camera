@@ -783,6 +783,7 @@ static int usb_hal_read(uint8_t *data, int len, int *bytesTransffered)
 	{
 		ret = *bytesTransffered;
 	}
+//	if(ret<0)printf("usb_hal_read ret:%d\n",ret);	
 	return ret;
 }
 
@@ -1376,7 +1377,8 @@ static void *usb_loop_recv(void *pParam)
 	while (g_thread_running_flag)
 	{
 		int bytesTransffered = 0;
-		int32_t ret = usb_hal_read(tmpbuf, USB_PACKET_MAX_SIZE /*sizeof(toolobj->g_usb_buf)*/, &bytesTransffered);
+		int ret = usb_hal_read(tmpbuf, USB_PACKET_MAX_SIZE /*sizeof(toolobj->g_usb_buf)*/, &bytesTransffered);
+		if(ret<0)printf("in recv,usb_hal_read ret:%d\n",ret);	
 
 		if (ret == 0)
 		{
@@ -1429,8 +1431,12 @@ static void *usb_loop_recv(void *pParam)
 				printf("false data!\n");
 				index = 0;
 			}
+		}else{
+			printf("false data,give up....\n");
+
 		}
 	}
+	printf("usb recv thread exit....\n");	
 	if (g_thread_running_flag == 0)
 	{
 
@@ -1586,10 +1592,11 @@ unsigned int feynman_connectcameraforid(const char *devicename)
 		while (g_thread_running_flag)
 		{
 			int bytesTransffered = 0;
-			int32_t ret = usb_hal_read(tmpbuf, USB_PACKET_MAX_SIZE /*sizeof(toolobj->g_usb_buf)*/, &bytesTransffered);
+			int ret = usb_hal_read(tmpbuf, USB_PACKET_MAX_SIZE /*sizeof(toolobj->g_usb_buf)*/, &bytesTransffered);
 
 			if (ret <= 0)
 			{
+				g_thread_running_flag = 0;
 				continue;
 			}
 

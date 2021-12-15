@@ -9,12 +9,12 @@
     <param name="fps" value="30" />
     <param name="pubrgb" value="false" />
     <param name="pubir" value="false" />
-    <param name="pubdotcloud" value="true" />
+    <param name="pubdotcloud" value="false" />
     <param name="pubdepth" value="true" />
     <param name="savedata" value="false" />
     <param name="pubdepthalign" value="false" />
     <param name="confidence" value="false" />
-    <param name="pubpseudo" value="true" />
+    <param name="pubpseudo" value="false" />
     <param name="pubimu" value="false" />
   </node>
 </launch>
