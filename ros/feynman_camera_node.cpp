@@ -559,7 +559,7 @@ void imucallback(void *data, void *userdata)
     s_feynman_imu_data *tmpimudata = (s_feynman_imu_data *)tmppack->data;
     feynman_camera::imu_info imudata;
 
-    if (sizeof(s_feynman_imu_data) == tmppack->len)
+    if (sizeof(s_feynman_imu_data) == tmppack->len&&tmpimudata->data_number>0)
     {
       imudata.imu_frames.resize(tmpimudata->data_number);
       static uint64_t lastbegintimestamp = 0, lastendtimestamp = 0;
@@ -608,13 +608,13 @@ void imucallback(void *data, void *userdata)
         if (info->imupublisher_single.getNumSubscribers() > 0)
           info->imupublisher_single.publish(imu_msg);
       }
+      info->imupublisher.publish(imudata);
     }
     else
     {
       printf("imudata len invalid:%d!=%d\n", tmppack->len, sizeof(s_feynman_imu_data));
     }
     //   printf("will publish imu!!!\n");
-    info->imupublisher.publish(imudata);
     //   printf("has publish imu!\n");
   }
 }
